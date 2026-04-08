@@ -1,0 +1,28 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.DS_Store
+
+# Environment variables - never commit these
+.env
+*.env.local
+
+# Firebase credentials
+google-services.json
+GoogleService-Info.plist
+
+# Native build folders
+android/
+ios/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
