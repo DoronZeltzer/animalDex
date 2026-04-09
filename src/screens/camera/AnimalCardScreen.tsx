@@ -1,11 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Modal,
+  Alert, ActivityIndicator, Modal, Animated, Easing,
 } from 'react-native';
-import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing, runOnJS,
-} from 'react-native-reanimated';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CameraStackParamList } from '../../types/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -15,7 +12,6 @@ import { COLORS, SIZES } from '../../config/constants';
 import { getCategoryLabel } from '../../utils/animalUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { serverTimestamp } from 'firebase/firestore';
-import 'react-native-get-random-values';
 
 type Route = RouteProp<CameraStackParamList, 'AnimalCard'>;
 
@@ -29,32 +25,23 @@ export default function AnimalCardScreen() {
   const [saved, setSaved] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
 
-  const cardScale = useSharedValue(0.85);
-  const cardOpacity = useSharedValue(0);
-  const animScale = useSharedValue(1);
-  const animOpacity = useSharedValue(1);
-  const animTranslateY = useSharedValue(0);
+  // Card reveal animation
+  const cardScale = useRef(new Animated.Value(0.85)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
 
-  React.useEffect(() => {
-    cardScale.value = withSpring(1, { damping: 14, stiffness: 100 });
-    cardOpacity.value = withTiming(1, { duration: 400 });
+  // Paper-suck animation values
+  const animScale = useRef(new Animated.Value(1)).current;
+  const animOpacity = useRef(new Animated.Value(1)).current;
+  const animTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(cardScale, { toValue: 1, damping: 14, stiffness: 100, useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
   }, []);
 
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: cardScale.value }],
-    opacity: cardOpacity.value,
-  }));
-
-  const animCardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: animScale.value }, { translateY: animTranslateY.value }],
-    opacity: animOpacity.value,
-  }));
-
-  const CATEGORY_COLOR = {
-    land: COLORS.land,
-    sea: COLORS.sea,
-    air: COLORS.air,
-  }[identification.category];
+  const CATEGORY_COLOR = { land: COLORS.land, sea: COLORS.sea, air: COLORS.air }[identification.category];
 
   const handleAddToCollection = async () => {
     if (!user || saving || saved) return;
@@ -68,11 +55,9 @@ export default function AnimalCardScreen() {
         return;
       }
 
-      // Upload photo
       const animalId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const photoURL = await uploadAnimalPhoto(user.uid, animalId, photoUri);
 
-      // Save to Firestore
       await addAnimalToCollection(user.uid, {
         animalId,
         commonName: identification.commonName,
@@ -94,13 +79,25 @@ export default function AnimalCardScreen() {
 
       // Paper-suck animation
       setShowAnimation(true);
-      animScale.value = withTiming(0.1, { duration: 800, easing: Easing.in(Easing.cubic) });
-      animTranslateY.value = withTiming(-300, { duration: 800, easing: Easing.in(Easing.cubic) });
-      animOpacity.value = withTiming(0, { duration: 700 }, (finished) => {
-        if (finished) {
-          runOnJS(onAnimationDone)();
-        }
-      });
+      Animated.parallel([
+        Animated.timing(animScale, {
+          toValue: 0.1,
+          duration: 800,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(animTranslateY, {
+          toValue: -300,
+          duration: 800,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(animOpacity, {
+          toValue: 0,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]).start(() => onAnimationDone());
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to save animal.');
       setSaving(false);
@@ -110,29 +107,27 @@ export default function AnimalCardScreen() {
   const onAnimationDone = () => {
     setSaved(true);
     setShowAnimation(false);
-    Alert.alert('🎉 Collected!', `${identification.commonName} has been added to your ${identification.category} collection!`, [
-      { text: 'Awesome!', onPress: () => navigation.navigate('HomeTab', { screen: 'Home' }) },
-    ]);
+    Alert.alert(
+      '🎉 Collected!',
+      `${identification.commonName} added to your ${identification.category} collection!`,
+      [{ text: 'Awesome!', onPress: () => navigation.navigate('HomeTab', { screen: 'Home' }) }]
+    );
   };
 
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Back button */}
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
 
-        <Animated.View style={[styles.card, cardStyle]}>
-          {/* Photo */}
+        <Animated.View style={[styles.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
           <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
 
-          {/* Category badge */}
           <View style={[styles.categoryBadge, { backgroundColor: CATEGORY_COLOR }]}>
             <Text style={styles.categoryText}>{getCategoryLabel(identification.category)}</Text>
           </View>
 
-          {/* Info */}
           <View style={styles.info}>
             <Text style={styles.commonName}>{identification.commonName}</Text>
             <Text style={styles.scientificName}>{identification.scientificName}</Text>
@@ -143,7 +138,6 @@ export default function AnimalCardScreen() {
               </View>
             )}
 
-            {/* Stats grid */}
             <View style={styles.statsGrid}>
               <StatItem icon="time-outline" label="Lifespan" value={identification.lifespan} />
               <StatItem icon="resize-outline" label="Size" value={identification.averageSize} />
@@ -151,13 +145,11 @@ export default function AnimalCardScreen() {
               <StatItem icon="star-outline" label="Confidence" value={`${Math.round(identification.confidence * 100)}%`} />
             </View>
 
-            {/* History */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About</Text>
               <Text style={styles.bodyText}>{identification.history}</Text>
             </View>
 
-            {/* Fun fact */}
             <View style={[styles.section, styles.funFactBox]}>
               <Text style={styles.funFactEmoji}>💡</Text>
               <Text style={styles.funFactText}>{identification.funFact}</Text>
@@ -165,7 +157,6 @@ export default function AnimalCardScreen() {
           </View>
         </Animated.View>
 
-        {/* CTA */}
         <TouchableOpacity
           style={[styles.collectBtn, { backgroundColor: CATEGORY_COLOR }, (saving || saved) && styles.collectBtnDisabled]}
           onPress={handleAddToCollection}
@@ -174,15 +165,19 @@ export default function AnimalCardScreen() {
           {saving ? (
             <ActivityIndicator color={COLORS.white} />
           ) : (
-            <Text style={styles.collectBtnText}>{saved ? '✓ Collected!' : `Add to ${identification.category.charAt(0).toUpperCase() + identification.category.slice(1)} Collection`}</Text>
+            <Text style={styles.collectBtnText}>
+              {saved ? '✓ Collected!' : `Add to ${identification.category.charAt(0).toUpperCase() + identification.category.slice(1)} Collection`}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Paper-suck animation overlay */}
       <Modal visible={showAnimation} transparent animationType="none">
         <View style={styles.modalOverlay}>
-          <Animated.View style={[styles.animCard, animCardStyle]}>
+          <Animated.View style={[styles.animCard, {
+            opacity: animOpacity,
+            transform: [{ scale: animScale }, { translateY: animTranslateY }],
+          }]}>
             <Image source={{ uri: photoUri }} style={styles.animPhoto} resizeMode="cover" />
             <Text style={styles.animName}>{identification.commonName}</Text>
           </Animated.View>
@@ -230,7 +225,7 @@ const styles = StyleSheet.create({
   collectBtnDisabled: { opacity: 0.6 },
   collectBtnText: { color: COLORS.white, fontSize: 17, fontWeight: '800' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
-  animCard: { backgroundColor: COLORS.card, borderRadius: 20, overflow: 'hidden', width: 200, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
+  animCard: { backgroundColor: COLORS.card, borderRadius: 20, overflow: 'hidden', width: 200, alignItems: 'center' },
   animPhoto: { width: 200, height: 120 },
   animName: { fontSize: 16, fontWeight: '800', color: COLORS.text, padding: 12 },
   sucking: { color: COLORS.white, fontSize: 16, fontWeight: '700', marginTop: 24 },

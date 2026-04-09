@@ -41,7 +41,8 @@
           "savePhotosPermission": "AnimalDex needs permission to save photos.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "scheme": "animaldex"
   }

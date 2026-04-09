@@ -1,22 +1,42 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
-// Replace these values with your Firebase project config.
-// For production, load from environment variables via expo-constants.
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'YOUR_API_KEY',
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? 'YOUR_AUTH_DOMAIN',
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'YOUR_PROJECT_ID',
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? 'YOUR_STORAGE_BUCKET',
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? 'YOUR_SENDER_ID',
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? 'YOUR_APP_ID',
-};
+// ─── PASTE YOUR FIREBASE CONFIG HERE ─────────────────────────────────────────
+// Go to console.firebase.google.com → your project → Project Settings →
+// Your Apps → Web app → copy the config object values below.
+const FIREBASE_API_KEY        = process.env.EXPO_PUBLIC_FIREBASE_API_KEY        ?? 'AIzaSyDXHQt1U0Vc-VYmca92B69UxNVXEG05cWw';
+const FIREBASE_AUTH_DOMAIN    = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN    ?? 'animaldex-b7859.firebaseapp.com';
+const FIREBASE_PROJECT_ID     = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID     ?? 'animaldex-b7859';
+const FIREBASE_STORAGE_BUCKET = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? 'animaldex-b7859.firebasestorage.app';
+const FIREBASE_SENDER_ID      = process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '631337717859';
+const FIREBASE_APP_ID         = process.env.EXPO_PUBLIC_FIREBASE_APP_ID         ?? '1:631337717859:web:2d783c1ea7e467543ca856';
+// ─────────────────────────────────────────────────────────────────────────────
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+export const FIREBASE_CONFIGURED = !!FIREBASE_API_KEY && !!FIREBASE_PROJECT_ID;
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+const app = FIREBASE_CONFIGURED
+  ? (getApps().length === 0
+      ? initializeApp({ apiKey: FIREBASE_API_KEY, authDomain: FIREBASE_AUTH_DOMAIN, projectId: FIREBASE_PROJECT_ID, storageBucket: FIREBASE_STORAGE_BUCKET, messagingSenderId: FIREBASE_SENDER_ID, appId: FIREBASE_APP_ID })
+      : getApp())
+  : ({} as any);
+
+// initializeAuth can only be called once per app instance.
+// On hot reload getApps() already has the app, so fall back to getAuth().
+function getFirebaseAuth() {
+  if (!FIREBASE_CONFIGURED) return {} as any;
+  try {
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+  } catch {
+    return getAuth(app);
+  }
+}
+
+export const auth    = getFirebaseAuth();
+export const db      = FIREBASE_CONFIGURED ? getFirestore(app) : ({} as any);
+export const storage = FIREBASE_CONFIGURED ? getStorage(app)   : ({} as any);
 export default app;

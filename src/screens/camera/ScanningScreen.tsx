@@ -1,8 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import Animated, {
-  useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing,
-} from 'react-native-reanimated';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { CameraStackParamList } from '../../types/navigation';
@@ -10,8 +7,7 @@ import { identifyAnimal } from '../../services/claudeService';
 import { COLORS } from '../../config/constants';
 import * as SecureStore from 'expo-secure-store';
 
-type Nav = StackNavigationProp<CameraStackParamList, 'Scanning'>;
-type Route = RouteProp<CameraStackParamList, 'Scanning'>;
+type Nav = RouteProp<CameraStackParamList, 'Scanning'>;
 
 const STATUS_MESSAGES = [
   'Scanning animal...',
@@ -21,13 +17,19 @@ const STATUS_MESSAGES = [
 ];
 
 export default function ScanningScreen() {
-  const navigation = useNavigation<Nav>();
-  const { params } = useRoute<Route>();
+  const navigation = useNavigation<any>();
+  const { params } = useRoute<Nav>();
   const [statusIdx, setStatusIdx] = useState(0);
-  const rotation = useSharedValue(0);
+  const rotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    rotation.value = withRepeat(withTiming(360, { duration: 1800, easing: Easing.linear }), -1, false);
+    Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 1800,
+        useNativeDriver: true,
+      })
+    ).start();
 
     const interval = setInterval(() => {
       setStatusIdx((i) => (i + 1) % STATUS_MESSAGES.length);
@@ -39,16 +41,21 @@ export default function ScanningScreen() {
   useEffect(() => {
     async function scan() {
       try {
-        const apiKey = (await SecureStore.getItemAsync('ANTHROPIC_API_KEY')) ?? process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
+        const apiKey =
+          (await SecureStore.getItemAsync('ANTHROPIC_API_KEY')) ??
+          process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ??
+          '';
         if (!apiKey) {
-          Alert.alert('API Key Missing', 'Please set your Anthropic API key in Settings.', [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ]);
+          Alert.alert(
+            'API Key Missing',
+            'Set your Anthropic API key in the Profile tab → Settings.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
           return;
         }
         const result = await identifyAnimal(params.base64, apiKey);
         if (!result.isAnimal) {
-          Alert.alert('No Animal Found', 'We could not identify an animal in this photo. Try again!', [
+          Alert.alert('No Animal Found', 'Could not identify an animal. Try again!', [
             { text: 'Try Again', onPress: () => navigation.goBack() },
           ]);
           return;
@@ -63,23 +70,18 @@ export default function ScanningScreen() {
     scan();
   }, []);
 
-  const sweepStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
     <View style={styles.container}>
-      {/* Blurred photo background */}
       <Image source={{ uri: params.photoUri }} style={StyleSheet.absoluteFill} blurRadius={20} />
       <View style={styles.overlay} />
 
-      {/* Radar animation */}
       <View style={styles.radarContainer}>
         <View style={styles.radarOuter}>
           <View style={styles.radarMid} />
           <View style={styles.radarInner} />
-          {/* Sweeping line */}
-          <Animated.View style={[styles.sweep, sweepStyle]} />
+          <Animated.View style={[styles.sweep, { transform: [{ rotate: spin }] }]} />
         </View>
         <Text style={styles.paw}>🐾</Text>
       </View>
@@ -125,9 +127,8 @@ const styles = StyleSheet.create({
     width: 100,
     height: 2,
     backgroundColor: COLORS.primary,
-    top: 100,
+    top: 99,
     left: 100,
-    transformOrigin: '0 1px',
     opacity: 0.9,
   },
   paw: { position: 'absolute', fontSize: 32, zIndex: 2 },

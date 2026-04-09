@@ -1,11 +1,8 @@
-import React from 'react';
-import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import React, { useRef } from 'react';
+import { TouchableOpacity, Text, View, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../config/constants';
 import { AnimalCategory } from '../../types/animal';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const BOOK_CONFIG: Record<AnimalCategory, {
   color: string;
@@ -15,8 +12,8 @@ const BOOK_CONFIG: Record<AnimalCategory, {
   emoji: string;
 }> = {
   land: { color: COLORS.land, lightColor: COLORS.landLight, icon: 'leaf', label: 'Land', emoji: '🪨' },
-  sea: { color: COLORS.sea, lightColor: COLORS.seaLight, icon: 'water', label: 'Sea', emoji: '🌊' },
-  air: { color: COLORS.air, lightColor: COLORS.airLight, icon: 'cloud', label: 'Air', emoji: '💨' },
+  sea:  { color: COLORS.sea,  lightColor: COLORS.seaLight,  icon: 'water', label: 'Sea',  emoji: '🌊' },
+  air:  { color: COLORS.air,  lightColor: COLORS.airLight,  icon: 'cloud', label: 'Air',  emoji: '💨' },
 };
 
 interface Props {
@@ -27,31 +24,35 @@ interface Props {
 
 export default function CategoryBook({ category, count, onPress }: Props) {
   const config = BOOK_CONFIG[category];
-  const scale = useSharedValue(1);
+  const scale = useRef(new Animated.Value(1)).current;
 
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const handlePressIn = () => {
+    Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 20 }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
+  };
 
   return (
-    <AnimatedTouchable
-      style={[styles.book, { backgroundColor: config.lightColor, borderColor: config.color }, animStyle]}
-      onPress={onPress}
-      onPressIn={() => { scale.value = withSpring(0.94); }}
-      onPressOut={() => { scale.value = withSpring(1); }}
-      activeOpacity={1}
-    >
-      {/* Count badge */}
-      <View style={[styles.badge, { backgroundColor: config.color }]}>
-        <Text style={styles.badgeText}>{count}</Text>
-      </View>
-
-      {/* Icon */}
-      <Text style={styles.emoji}>{config.emoji}</Text>
-      <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
-        <Ionicons name={config.icon} size={24} color={COLORS.white} />
-      </View>
-      <Text style={[styles.label, { color: config.color }]}>{config.label}</Text>
-      <Text style={styles.sublabel}>Animals</Text>
-    </AnimatedTouchable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity
+        style={[styles.book, { backgroundColor: config.lightColor, borderColor: config.color }]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        <View style={[styles.badge, { backgroundColor: config.color }]}>
+          <Text style={styles.badgeText}>{count}</Text>
+        </View>
+        <Text style={styles.emoji}>{config.emoji}</Text>
+        <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
+          <Ionicons name={config.icon} size={24} color={COLORS.white} />
+        </View>
+        <Text style={[styles.label, { color: config.color }]}>{config.label}</Text>
+        <Text style={styles.sublabel}>Animals</Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 

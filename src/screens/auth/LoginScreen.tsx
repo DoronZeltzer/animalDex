@@ -3,20 +3,47 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../types/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../config/constants';
 import { Ionicons } from '@expo/vector-icons';
 
+WebBrowser.maybeCompleteAuthSession();
+
 type Props = { navigation: StackNavigationProp<AuthStackParamList, 'Login'> };
 
+// Paste your Google Web Client ID here (from Google Cloud Console →
+// APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client)
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+
 export default function LoginScreen({ navigation }: Props) {
-  const { signIn } = useAuth();
+  const { signIn, googleSignIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const [, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_CLIENT_ID,
+    iosClientId: GOOGLE_CLIENT_ID,
+    androidClientId: GOOGLE_CLIENT_ID,
+  });
+
+  React.useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const idToken = googleResponse.authentication?.idToken;
+      if (idToken) {
+        setGoogleLoading(true);
+        googleSignIn(idToken)
+          .catch((e: any) => Alert.alert('Google Sign-In Failed', e.message))
+          .finally(() => setGoogleLoading(false));
+      }
+    }
+  }, [googleResponse]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -27,23 +54,38 @@ export default function LoginScreen({ navigation }: Props) {
       setLoading(true);
       await signIn(email.trim(), password);
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message ?? 'An error occurred.');
+      const code = error.code ?? '';
+      const msg = code === 'auth/configuration-not-found'
+        ? 'Email/Password sign-in is not enabled.\n\nGo to Firebase Console → Authentication → Sign-in method → Email/Password → Enable.'
+        : code === 'auth/api-key-not-valid'
+        ? 'Firebase credentials are not configured. Open src/config/firebase.ts and paste your Firebase config.'
+        : error.message ?? 'An error occurred.';
+      Alert.alert('Login Failed', msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      Alert.alert(
+        'Google Sign-In Not Configured',
+        'Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to your .env file to enable Google Sign-In.\n\nGet it from Google Cloud Console → APIs & Services → Credentials.'
+      );
+      return;
+    }
+    await googlePromptAsync();
+  };
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        {/* Logo area */}
         <View style={styles.logoArea}>
           <Text style={styles.logo}>🐾</Text>
           <Text style={styles.appName}>AnimalDex</Text>
           <Text style={styles.tagline}>Discover & Collect the Animal Kingdom</Text>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
           <Text style={styles.label}>Email</Text>
           <TextInput
@@ -74,11 +116,7 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.primaryBtnText}>Log In</Text>
-            )}
+            {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryBtnText}>Log In</Text>}
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
@@ -87,13 +125,18 @@ export default function LoginScreen({ navigation }: Props) {
             <View style={styles.divider} />
           </View>
 
-          <TouchableOpacity style={styles.googleBtn} onPress={() => Alert.alert('Google Sign-In', 'Configure Google Sign-In credentials to enable this feature.')}>
-            <Text style={styles.googleBtnText}>🔵  Continue with Google</Text>
-          </TouchableOpacity>
+          {GOOGLE_CLIENT_ID ? (
+            <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleSignIn} disabled={googleLoading}>
+              {googleLoading
+                ? <ActivityIndicator color={COLORS.text} />
+                : <Text style={styles.googleBtnText}>🔵  Continue with Google</Text>}
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.registerLink}>
             <Text style={styles.registerLinkText}>
-              Don't have an account? <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Sign Up</Text>
+              Don't have an account?{' '}
+              <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -124,25 +167,12 @@ const styles = StyleSheet.create({
   },
   passwordRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   eyeBtn: { padding: 14, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
-  primaryBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
+  primaryBtn: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
   primaryBtnText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 12 },
   divider: { flex: 1, height: 1, backgroundColor: COLORS.border },
   dividerText: { color: COLORS.textSecondary, fontSize: 13 },
-  googleBtn: {
-    backgroundColor: COLORS.card,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+  googleBtn: { backgroundColor: COLORS.card, borderRadius: 14, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
   googleBtnText: { fontSize: 16, fontWeight: '600', color: COLORS.text },
   registerLink: { alignItems: 'center', marginTop: 24 },
   registerLinkText: { fontSize: 14, color: COLORS.textSecondary },

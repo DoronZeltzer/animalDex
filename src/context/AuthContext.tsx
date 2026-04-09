@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, FIREBASE_CONFIGURED } from '../config/firebase';
 import { signUpWithEmail, signInWithEmail, signInWithGoogle, signOut } from '../services/authService';
 
 interface AuthContextType {
@@ -19,11 +19,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    if (!FIREBASE_CONFIGURED) {
       setLoading(false);
-    });
-    return unsubscribe;
+      return;
+    }
+
+    const timeout = setTimeout(() => setLoading(false), 3000);
+    let unsubscribe: () => void = () => {};
+    try {
+      unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        clearTimeout(timeout);
+        setUser(firebaseUser);
+        setLoading(false);
+      });
+    } catch {
+      clearTimeout(timeout);
+      setLoading(false);
+    }
+
+    return () => {
+      clearTimeout(timeout);
+      unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, displayName: string) => {

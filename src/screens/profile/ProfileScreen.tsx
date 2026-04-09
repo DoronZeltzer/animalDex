@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useCollection } from '../../hooks/useCollection';
-import { COLORS, SIZES, ACHIEVEMENTS } from '../../config/constants';
+import { COLORS, SIZES } from '../../config/constants';
+import { ACHIEVEMENTS } from '../../types/user';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 
@@ -65,7 +66,7 @@ export default function ProfileScreen() {
       {/* Achievements */}
       <Text style={styles.sectionTitle}>Achievements</Text>
       <View style={styles.achievementsGrid}>
-        {ACHIEVEMENTS.map((ach) => {
+        {ACHIEVEMENTS.map((ach: typeof ACHIEVEMENTS[0]) => {
           const unlocked = (ach.id === 'first_animal' && total >= 1)
             || (ach.id === 'land_10' && land.length >= 10)
             || (ach.id === 'sea_10' && sea.length >= 10)

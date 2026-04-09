@@ -1,17 +1,17 @@
 export const COLORS = {
   // Category colors
-  land: '#4CAF50',
-  landLight: '#E8F5E9',
-  sea: '#2196F3',
-  seaLight: '#E3F2FD',
-  air: '#78909C',
-  airLight: '#ECEFF1',
+  land: '#2E7D32',
+  landLight: '#C8E6C9',
+  sea: '#1565C0',
+  seaLight: '#BBDEFB',
+  air: '#455A64',
+  airLight: '#CFD8DC',
 
   // Brand colors
-  primary: '#4CAF50',
-  primaryDark: '#388E3C',
-  secondary: '#FF8F00',
-  accent: '#FF6B35',
+  primary: '#2E7D32',
+  primaryDark: '#1B5E20',
+  secondary: '#E65100',
+  accent: '#BF360C',
 
   // UI
   background: '#FAFAF5',
