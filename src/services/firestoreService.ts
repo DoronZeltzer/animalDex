@@ -35,23 +35,26 @@ export function subscribeToUserProfile(uid: string, onUpdate: (profile: UserProf
 // ── Animals ───────────────────────────────────────────────────────────────────
 
 export async function addAnimalToCollection(uid: string, animal: CollectedAnimal): Promise<void> {
+  // Save the animal — this is the critical write
   const animalRef = doc(db, 'users', uid, 'animals', animal.animalId);
-  await setDoc(animalRef, animal);
+  await Promise.race([
+    setDoc(animalRef, animal),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Save timed out. Check your Firestore rules.')), 8000)),
+  ]);
 
-  // Update user counters
+  // Fire-and-forget counter + leaderboard updates (non-blocking)
   const countField = `${animal.category}Count`;
-  await updateDoc(doc(db, 'users', uid), {
+  setDoc(doc(db, 'users', uid), {
     totalAnimals: increment(1),
     [countField]: increment(1),
-  });
+  }, { merge: true }).catch(() => {});
 
-  // Update leaderboard
-  await setDoc(doc(db, 'leaderboard', uid), {
+  setDoc(doc(db, 'leaderboard', uid), {
     uid,
     totalAnimals: increment(1),
     weeklyCaptures: increment(1),
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  }, { merge: true }).catch(() => {});
 }
 
 export function subscribeToUserAnimals(

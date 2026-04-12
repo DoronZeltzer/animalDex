@@ -2,10 +2,9 @@ import axios from 'axios';
 import { AnimalIdentification } from '../types/animal';
 import { mapToCategory } from '../utils/animalUtils';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-5-20241022';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-const SYSTEM_PROMPT = `You are an expert wildlife biologist and animal identifier. When given an image, identify the animal and respond with ONLY a valid JSON object — no markdown, no explanation, just raw JSON.
+const PROMPT = `You are an expert wildlife biologist. Look at this image and identify the animal. Respond with ONLY a valid JSON object — no markdown, no explanation, just raw JSON.
 
 If the image does NOT contain an animal, return: {"isAnimal": false}
 
@@ -14,7 +13,7 @@ If it DOES contain an animal, return this exact structure:
   "isAnimal": true,
   "commonName": "string",
   "scientificName": "string",
-  "category": "land" | "sea" | "air",
+  "category": "land" or "sea" or "air",
   "subcategory": "string (e.g. dogs, fish, eagles)",
   "breed": "string or null",
   "lifespan": "string (e.g. 10-13 years)",
@@ -22,7 +21,7 @@ If it DOES contain an animal, return this exact structure:
   "weight": "string (e.g. 20-30 kg)",
   "history": "2-3 sentences about the animal's origin, habitat, and behavior.",
   "funFact": "One interesting fun fact about this animal.",
-  "confidence": 0.0-1.0
+  "confidence": 0.0 to 1.0
 }`;
 
 export async function identifyAnimal(
@@ -30,48 +29,45 @@ export async function identifyAnimal(
   apiKey: string
 ): Promise<AnimalIdentification> {
   const response = await axios.post(
-    ANTHROPIC_API_URL,
+    `${GEMINI_API_URL}?key=${apiKey}`,
     {
-      model: MODEL,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [
+      contents: [
         {
-          role: 'user',
-          content: [
+          parts: [
             {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
+              inline_data: {
+                mime_type: 'image/jpeg',
                 data: base64Image,
               },
             },
             {
-              type: 'text',
-              text: 'Please identify the animal in this image and return the JSON response.',
+              text: PROMPT,
             },
           ],
         },
       ],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1024,
+      },
     },
     {
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+        'Content-Type': 'application/json',
       },
     }
   );
 
-  const text: string = response.data.content[0].text.trim();
-  const parsed = JSON.parse(text);
+  const text: string = response.data.candidates[0].content.parts[0].text.trim();
+
+  // Strip markdown code fences if present
+  const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+  const parsed = JSON.parse(clean);
 
   if (!parsed.isAnimal) {
     return { isAnimal: false } as AnimalIdentification;
   }
 
-  // Fill in category/subcategory from our taxonomy if Claude's response needs normalization
   const { category, subcategory } = mapToCategory(parsed.commonName);
 
   return {

@@ -42,13 +42,13 @@ export default function ScanningScreen() {
     async function scan() {
       try {
         const apiKey =
-          (await SecureStore.getItemAsync('ANTHROPIC_API_KEY')) ??
-          process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ??
+          (await SecureStore.getItemAsync('GOOGLE_API_KEY')) ??
+          process.env.EXPO_PUBLIC_GOOGLE_API_KEY ??
           '';
         if (!apiKey) {
           Alert.alert(
             'API Key Missing',
-            'Set your Anthropic API key in the Profile tab → Settings.',
+            'Set your Google API key in the Profile tab → Settings.',
             [{ text: 'OK', onPress: () => navigation.goBack() }]
           );
           return;
@@ -62,7 +62,8 @@ export default function ScanningScreen() {
         }
         navigation.replace('AnimalCard', { identification: result, photoUri: params.photoUri });
       } catch (error: any) {
-        const msg = error.response?.data?.error?.message ?? error.message ?? 'Could not identify animal.';
+        const apiErr = error.response?.data?.error;
+        const msg = apiErr ? `${apiErr.message} (${apiErr.status ?? apiErr.code})` : (error.message ?? 'Could not identify animal.');
         Alert.alert('Scan Failed', msg, [
           { text: 'Try Again', onPress: () => navigation.goBack() },
         ]);

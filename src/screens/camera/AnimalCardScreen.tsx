@@ -7,7 +7,6 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CameraStackParamList } from '../../types/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { addAnimalToCollection, hasAnimal } from '../../services/firestoreService';
-import { uploadAnimalPhoto } from '../../services/storageService';
 import { COLORS, SIZES } from '../../config/constants';
 import { getCategoryLabel } from '../../utils/animalUtils';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,7 +55,7 @@ export default function AnimalCardScreen() {
       }
 
       const animalId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const photoURL = await uploadAnimalPhoto(user.uid, animalId, photoUri);
+      const photoURL = photoUri;
 
       await addAnimalToCollection(user.uid, {
         animalId,
