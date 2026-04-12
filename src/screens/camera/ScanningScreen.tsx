@@ -62,7 +62,8 @@ export default function ScanningScreen() {
         }
         navigation.replace('AnimalCard', { identification: result, photoUri: params.photoUri });
       } catch (error: any) {
-        Alert.alert('Scan Failed', error.message ?? 'Could not identify animal.', [
+        const msg = error.response?.data?.error?.message ?? error.message ?? 'Could not identify animal.';
+        Alert.alert('Scan Failed', msg, [
           { text: 'Try Again', onPress: () => navigation.goBack() },
         ]);
       }

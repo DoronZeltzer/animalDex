@@ -3,7 +3,7 @@ import { AnimalIdentification } from '../types/animal';
 import { mapToCategory } from '../utils/animalUtils';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = 'claude-sonnet-4-5-20241022';
 
 const SYSTEM_PROMPT = `You are an expert wildlife biologist and animal identifier. When given an image, identify the animal and respond with ONLY a valid JSON object — no markdown, no explanation, just raw JSON.
 
