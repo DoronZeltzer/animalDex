@@ -48,7 +48,7 @@ export async function identifyAnimal(
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
       },
     },
     {
@@ -58,11 +58,27 @@ export async function identifyAnimal(
     }
   );
 
-  const text: string = response.data.candidates[0].content.parts[0].text.trim();
+  const candidate = response.data.candidates?.[0];
+  if (!candidate || candidate.finishReason === 'SAFETY') {
+    return { isAnimal: false } as AnimalIdentification;
+  }
 
-  // Strip markdown code fences if present
-  const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-  const parsed = JSON.parse(clean);
+  const text: string = candidate.content?.parts?.[0]?.text?.trim() ?? '';
+  if (!text) throw new Error('Empty response from Gemini.');
+
+  // Strip markdown code fences if present, extract first JSON object
+  let clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```[\s\S]*$/i, '').trim();
+
+  // Extract JSON object/array if surrounded by extra text
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (jsonMatch) clean = jsonMatch[0];
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(clean);
+  } catch {
+    throw new Error(`Could not parse response. Raw: ${clean.slice(0, 100)}`);
+  }
 
   if (!parsed.isAnimal) {
     return { isAnimal: false } as AnimalIdentification;

@@ -7,6 +7,7 @@ import { CameraStackParamList } from '../../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../config/constants';
 import { resizeAndCompressImage } from '../../utils/imageUtils';
+import * as ImagePicker from 'expo-image-picker';
 
 type Nav = StackNavigationProp<CameraStackParamList, 'Camera'>;
 
@@ -32,6 +33,26 @@ export default function CameraScreen() {
       </View>
     );
   }
+
+  const handleUpload = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Required', 'Please allow access to your photo library.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        base64: false,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const { uri, base64 } = await resizeAndCompressImage(result.assets[0].uri);
+      navigation.navigate('Scanning', { photoUri: uri, base64 });
+    } catch (error: any) {
+      Alert.alert('Error', error.message ?? 'Failed to load image.');
+    }
+  };
 
   const handleCapture = async () => {
     if (capturing || !cameraRef.current) return;
@@ -89,7 +110,9 @@ export default function CameraScreen() {
           <View style={styles.shutterInner} />
         </TouchableOpacity>
 
-        <View style={styles.iconBtn} />
+        <TouchableOpacity style={styles.iconBtn} onPress={handleUpload}>
+          <Ionicons name="images-outline" size={26} color={COLORS.white} />
+        </TouchableOpacity>
       </View>
     </View>
   );

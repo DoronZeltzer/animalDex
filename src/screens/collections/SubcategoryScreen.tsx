@@ -1,10 +1,11 @@
-import React from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CollectionsStackParamList } from '../../types/navigation';
 import { useCollection } from '../../hooks/useCollection';
 import { COLORS, SIZES } from '../../config/constants';
 import { CollectedAnimal } from '../../types/animal';
+import { Ionicons } from '@expo/vector-icons';
 
 type Route = RouteProp<CollectionsStackParamList, 'Subcategory'>;
 
@@ -12,6 +13,7 @@ export default function SubcategoryScreen() {
   const navigation = useNavigation<any>();
   const { params } = useRoute<Route>();
   const { animals, loading } = useCollection(params.category);
+  const [query, setQuery] = useState('');
 
   const CATEGORY_COLOR = { land: COLORS.land, sea: COLORS.sea, air: COLORS.air }[params.category];
 
@@ -19,12 +21,15 @@ export default function SubcategoryScreen() {
     (a) => a.subcategory?.toLowerCase() === params.subcategory.toLowerCase()
   );
 
+  const results = query.trim()
+    ? filtered.filter((a) =>
+        a.commonName.toLowerCase().includes(query.toLowerCase()) ||
+        a.scientificName?.toLowerCase().includes(query.toLowerCase())
+      )
+    : filtered;
+
   if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={CATEGORY_COLOR} size="large" />
-      </View>
-    );
+    return <View style={styles.loading}><ActivityIndicator color={CATEGORY_COLOR} size="large" /></View>;
   }
 
   if (filtered.length === 0) {
@@ -39,9 +44,34 @@ export default function SubcategoryScreen() {
 
   return (
     <FlatList
-      data={filtered}
+      data={results}
       keyExtractor={(a) => a.animalId}
       numColumns={2}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <Text style={styles.total}>{filtered.length} animal{filtered.length !== 1 ? 's' : ''} collected</Text>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={16} color={COLORS.textSecondary} style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search animals..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <Ionicons name="close-circle" size={16} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {query.trim().length > 0 && results.length === 0 && (
+            <Text style={styles.noResults}>No results for "{query}"</Text>
+          )}
+        </View>
+      }
       contentContainerStyle={styles.content}
       style={{ backgroundColor: COLORS.background }}
       renderItem={({ item }) => (
@@ -74,6 +104,19 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text, marginTop: 12 },
   emptyText: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginTop: 8 },
   content: { padding: SIZES.paddingSmall },
+  header: { paddingHorizontal: SIZES.paddingSmall, paddingTop: SIZES.paddingSmall, paddingBottom: 4 },
+  total: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 10 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFEFEF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+  },
+  searchInput: { flex: 1, fontSize: 13, color: COLORS.text },
+  noResults: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 14, marginVertical: 12 },
   card: {
     flex: 1,
     margin: SIZES.paddingSmall,

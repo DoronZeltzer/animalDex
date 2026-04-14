@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CollectionsStackParamList } from '../../types/navigation';
 import { useCollection } from '../../hooks/useCollection';
@@ -18,17 +18,14 @@ export default function CategoryScreen() {
   const navigation = useNavigation<any>();
   const { params } = useRoute<Route>();
   const { animals, loading } = useCollection(params.category);
+  const [query, setQuery] = useState('');
 
   const CATEGORY_COLOR = { land: COLORS.land, sea: COLORS.sea, air: COLORS.air }[params.category];
   const CATEGORY_LABEL = { land: 'Land', sea: 'Sea', air: 'Air' }[params.category];
   const subcategories = ANIMAL_SUBCATEGORIES[params.category] ?? [];
 
   if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={CATEGORY_COLOR} size="large" />
-      </View>
-    );
+    return <View style={styles.loading}><ActivityIndicator color={CATEGORY_COLOR} size="large" /></View>;
   }
 
   if (animals.length === 0) {
@@ -48,33 +45,57 @@ export default function CategoryScreen() {
     grouped[key] = (grouped[key] ?? 0) + 1;
   });
 
-  // Only show subcategories that have animals
   const activeSubcategories = subcategories.filter((s) => grouped[s] > 0);
-  // Also catch any subcategories not in the predefined list
   Object.keys(grouped).forEach((k) => {
     if (!activeSubcategories.includes(k)) activeSubcategories.push(k);
   });
 
+  const filteredSubs = query.trim()
+    ? activeSubcategories.filter((s) => s.toLowerCase().includes(query.toLowerCase()))
+    : activeSubcategories;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.total}>{animals.length} animal{animals.length !== 1 ? 's' : ''} collected</Text>
-      {activeSubcategories.map((sub) => (
-        <TouchableOpacity
-          key={sub}
-          style={[styles.card, { borderColor: CATEGORY_COLOR }]}
-          onPress={() => navigation.navigate('Subcategory', { category: params.category, subcategory: sub })}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.iconArea, { backgroundColor: CATEGORY_COLOR + '22' }]}>
-            <Text style={styles.emoji}>{CATEGORY_EMOJIS[params.category]?.[sub] ?? '🐾'}</Text>
-          </View>
-          <View style={styles.info}>
-            <Text style={[styles.subName, { color: CATEGORY_COLOR }]}>{sub.charAt(0).toUpperCase() + sub.slice(1)}</Text>
-            <Text style={styles.count}>{grouped[sub]} collected</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} style={{ marginRight: 14 }} />
-        </TouchableOpacity>
-      ))}
+
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={16} color={COLORS.textSecondary} style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search subcategories..."
+          placeholderTextColor={COLORS.textSecondary}
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+        />
+        {query.length > 0 && (
+          <TouchableOpacity onPress={() => setQuery('')}>
+            <Ionicons name="close-circle" size={16} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {filteredSubs.length === 0 ? (
+        <Text style={styles.noResults}>No results for "{query}"</Text>
+      ) : (
+        filteredSubs.map((sub) => (
+          <TouchableOpacity
+            key={sub}
+            style={[styles.card, { borderColor: CATEGORY_COLOR }]}
+            onPress={() => navigation.navigate('Subcategory', { category: params.category, subcategory: sub })}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.iconArea, { backgroundColor: CATEGORY_COLOR + '22' }]}>
+              <Text style={styles.emoji}>{CATEGORY_EMOJIS[params.category]?.[sub] ?? '🐾'}</Text>
+            </View>
+            <View style={styles.info}>
+              <Text style={[styles.subName, { color: CATEGORY_COLOR }]}>{sub.charAt(0).toUpperCase() + sub.slice(1)}</Text>
+              <Text style={styles.count}>{grouped[sub]} collected</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} style={{ marginRight: 14 }} />
+          </TouchableOpacity>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -87,7 +108,18 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginTop: 8 },
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SIZES.padding, paddingBottom: 32 },
-  total: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 16 },
+  total: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 12 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFEFEF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 16,
+  },
+  searchInput: { flex: 1, fontSize: 13, color: COLORS.text },
+  noResults: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 14, marginTop: 24 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

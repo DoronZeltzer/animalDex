@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Modal, Animated, Easing,
+  Alert, ActivityIndicator, Animated, Easing,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CameraStackParamList } from '../../types/navigation';
@@ -22,16 +22,14 @@ export default function AnimalCardScreen() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showAnimation, setShowAnimation] = useState(false);
 
   // Card reveal animation
   const cardScale = useRef(new Animated.Value(0.85)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
 
-  // Paper-suck animation values
-  const animScale = useRef(new Animated.Value(1)).current;
-  const animOpacity = useRef(new Animated.Value(1)).current;
-  const animTranslateY = useRef(new Animated.Value(0)).current;
+  // Toast animation
+  const toastY = useRef(new Animated.Value(-100)).current;
+  const toastOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -41,6 +39,22 @@ export default function AnimalCardScreen() {
   }, []);
 
   const CATEGORY_COLOR = { land: COLORS.land, sea: COLORS.sea, air: COLORS.air }[identification.category];
+
+  const showToast = () => {
+    Animated.parallel([
+      Animated.timing(toastY, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start(() => {
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(toastY, { toValue: -100, duration: 350, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start(() => {
+          navigation.navigate('CameraTab', { screen: 'Camera' });
+        });
+      }, 2500);
+    });
+  };
 
   const handleAddToCollection = async () => {
     if (!user || saving || saved) return;
@@ -63,7 +77,7 @@ export default function AnimalCardScreen() {
         scientificName: identification.scientificName,
         category: identification.category,
         subcategory: identification.subcategory,
-        breed: identification.breed,
+        breed: identification.breed ?? null,
         photoURL,
         thumbnailURL: photoURL,
         lifespan: identification.lifespan,
@@ -76,45 +90,24 @@ export default function AnimalCardScreen() {
         isFirstCapture: true,
       });
 
-      // Paper-suck animation
-      setShowAnimation(true);
-      Animated.parallel([
-        Animated.timing(animScale, {
-          toValue: 0.1,
-          duration: 800,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(animTranslateY, {
-          toValue: -300,
-          duration: 800,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(animOpacity, {
-          toValue: 0,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]).start(() => onAnimationDone());
+      setSaved(true);
+      showToast();
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to save animal.');
       setSaving(false);
     }
   };
 
-  const onAnimationDone = () => {
-    setSaved(true);
-    setShowAnimation(false);
-    Alert.alert(
-      '🎉 Collected!',
-      `${identification.commonName} added to your ${identification.category} collection!`,
-      [{ text: 'Awesome!', onPress: () => navigation.navigate('HomeTab', { screen: 'Home' }) }]
-    );
-  };
-
   return (
     <>
+      {/* Toast notification */}
+      <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }], opacity: toastOpacity }]}>
+        <Ionicons name="checkmark-circle" size={22} color={COLORS.white} />
+        <Text style={styles.toastText}>
+          {identification.commonName} added to {identification.category} collection!
+        </Text>
+      </Animated.View>
+
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
@@ -170,19 +163,6 @@ export default function AnimalCardScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
-
-      <Modal visible={showAnimation} transparent animationType="none">
-        <View style={styles.modalOverlay}>
-          <Animated.View style={[styles.animCard, {
-            opacity: animOpacity,
-            transform: [{ scale: animScale }, { translateY: animTranslateY }],
-          }]}>
-            <Image source={{ uri: photoUri }} style={styles.animPhoto} resizeMode="cover" />
-            <Text style={styles.animName}>{identification.commonName}</Text>
-          </Animated.View>
-          <Text style={styles.sucking}>Adding to collection...</Text>
-        </View>
-      </Modal>
     </>
   );
 }
@@ -201,6 +181,26 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SIZES.padding, paddingBottom: 40 },
   backBtn: { marginBottom: 12, padding: 4, alignSelf: 'flex-start' },
+  toast: {
+    position: 'absolute',
+    top: 56,
+    left: 16,
+    right: 16,
+    backgroundColor: COLORS.success,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  toastText: { flex: 1, color: COLORS.white, fontSize: 14, fontWeight: '700' },
   card: { backgroundColor: COLORS.card, borderRadius: 24, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 8 },
   photo: { width: '100%', height: 260 },
   categoryBadge: { position: 'absolute', top: 16, right: 16, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
@@ -223,9 +223,4 @@ const styles = StyleSheet.create({
   collectBtn: { borderRadius: 16, paddingVertical: 17, alignItems: 'center', marginTop: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
   collectBtnDisabled: { opacity: 0.6 },
   collectBtnText: { color: COLORS.white, fontSize: 17, fontWeight: '800' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
-  animCard: { backgroundColor: COLORS.card, borderRadius: 20, overflow: 'hidden', width: 200, alignItems: 'center' },
-  animPhoto: { width: 200, height: 120 },
-  animName: { fontSize: 16, fontWeight: '800', color: COLORS.text, padding: 12 },
-  sucking: { color: COLORS.white, fontSize: 16, fontWeight: '700', marginTop: 24 },
 });
