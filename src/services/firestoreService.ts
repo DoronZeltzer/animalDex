@@ -64,7 +64,7 @@ export function subscribeToUserAnimals(
 ): Unsubscribe {
   const animalsRef = collection(db, 'users', uid, 'animals');
   const q = category
-    ? query(animalsRef, where('category', '==', category), orderBy('capturedAt', 'desc'))
+    ? query(animalsRef, where('category', '==', category))
     : query(animalsRef, orderBy('capturedAt', 'desc'));
 
   return onSnapshot(q, (snap) => {

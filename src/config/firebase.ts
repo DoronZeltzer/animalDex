@@ -1,8 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeAuth, getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── PASTE YOUR FIREBASE CONFIG HERE ─────────────────────────────────────────
 // Go to console.firebase.google.com → your project → Project Settings →
@@ -23,20 +23,18 @@ const app = FIREBASE_CONFIGURED
       : getApp())
   : ({} as any);
 
-// initializeAuth can only be called once per app instance.
-// On hot reload getApps() already has the app, so fall back to getAuth().
 function getFirebaseAuth() {
   if (!FIREBASE_CONFIGURED) return {} as any;
   try {
     return initializeAuth(app, {
-      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+      persistence: (require('firebase/auth') as any).getReactNativePersistence?.(AsyncStorage),
     });
   } catch {
     return getAuth(app);
   }
 }
+export const auth = getFirebaseAuth();
 
-export const auth    = getFirebaseAuth();
 export const db      = FIREBASE_CONFIGURED ? getFirestore(app) : ({} as any);
 export const storage = FIREBASE_CONFIGURED ? getStorage(app)   : ({} as any);
 export default app;
