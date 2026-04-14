@@ -1,12 +1,18 @@
 import React from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CollectionsStackParamList } from '../../types/navigation';
 import { useCollection } from '../../hooks/useCollection';
-import { COLORS, SIZES } from '../../config/constants';
-import { CollectedAnimal } from '../../types/animal';
+import { COLORS, SIZES, ANIMAL_SUBCATEGORIES } from '../../config/constants';
+import { Ionicons } from '@expo/vector-icons';
 
 type Route = RouteProp<CollectionsStackParamList, 'Category'>;
+
+const CATEGORY_EMOJIS: Record<string, Record<string, string>> = {
+  land: { dogs: '🐶', cats: '🐱', horses: '🐴', cattle: '🐄', deer: '🦌', foxes: '🦊', bears: '🐻', elephants: '🐘', lions: '🦁', tigers: '🐯', primates: '🐒', reptiles: '🦎', insects: '🐛', 'other land': '🐾' },
+  sea:  { fish: '🐟', sharks: '🦈', dolphins: '🐬', whales: '🐋', turtles: '🐢', crabs: '🦀', jellyfish: '🪼', octopus: '🐙', coral: '🪸', 'other sea': '🌊' },
+  air:  { eagles: '🦅', owls: '🦉', parrots: '🦜', pigeons: '🕊️', ducks: '🦆', penguins: '🐧', bats: '🦇', butterflies: '🦋', 'other air': '💨' },
+};
 
 export default function CategoryScreen() {
   const navigation = useNavigation<any>();
@@ -15,6 +21,7 @@ export default function CategoryScreen() {
 
   const CATEGORY_COLOR = { land: COLORS.land, sea: COLORS.sea, air: COLORS.air }[params.category];
   const CATEGORY_LABEL = { land: 'Land', sea: 'Sea', air: 'Air' }[params.category];
+  const subcategories = ANIMAL_SUBCATEGORIES[params.category] ?? [];
 
   if (loading) {
     return (
@@ -34,30 +41,41 @@ export default function CategoryScreen() {
     );
   }
 
-  return (
-    <FlatList
-      data={animals}
-      keyExtractor={(a) => a.animalId}
-      numColumns={2}
-      contentContainerStyle={styles.content}
-      style={{ backgroundColor: COLORS.background }}
-      renderItem={({ item }) => (
-        <AnimalCard animal={item} color={CATEGORY_COLOR} onPress={() => navigation.navigate('AnimalDetail', { animalId: item.animalId })} />
-      )}
-    />
-  );
-}
+  // Group animals by subcategory
+  const grouped: Record<string, number> = {};
+  animals.forEach((a) => {
+    const key = a.subcategory?.toLowerCase() ?? 'other';
+    grouped[key] = (grouped[key] ?? 0) + 1;
+  });
 
-function AnimalCard({ animal, color, onPress }: { animal: CollectedAnimal; color: string; onPress: () => void }) {
+  // Only show subcategories that have animals
+  const activeSubcategories = subcategories.filter((s) => grouped[s] > 0);
+  // Also catch any subcategories not in the predefined list
+  Object.keys(grouped).forEach((k) => {
+    if (!activeSubcategories.includes(k)) activeSubcategories.push(k);
+  });
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      <Image source={{ uri: animal.photoURL }} style={styles.photo} />
-      <View style={styles.cardInfo}>
-        <Text style={[styles.name, { color }]} numberOfLines={1}>{animal.commonName}</Text>
-        <Text style={styles.scientific} numberOfLines={1}>{animal.scientificName}</Text>
-        <Text style={styles.subcategory}>{animal.subcategory}</Text>
-      </View>
-    </TouchableOpacity>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.total}>{animals.length} animal{animals.length !== 1 ? 's' : ''} collected</Text>
+      {activeSubcategories.map((sub) => (
+        <TouchableOpacity
+          key={sub}
+          style={[styles.card, { borderColor: CATEGORY_COLOR }]}
+          onPress={() => navigation.navigate('Subcategory', { category: params.category, subcategory: sub })}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconArea, { backgroundColor: CATEGORY_COLOR + '22' }]}>
+            <Text style={styles.emoji}>{CATEGORY_EMOJIS[params.category]?.[sub] ?? '🐾'}</Text>
+          </View>
+          <View style={styles.info}>
+            <Text style={[styles.subName, { color: CATEGORY_COLOR }]}>{sub.charAt(0).toUpperCase() + sub.slice(1)}</Text>
+            <Text style={styles.count}>{grouped[sub]} collected</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} style={{ marginRight: 14 }} />
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -67,22 +85,27 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 64 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text, marginTop: 12 },
   emptyText: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginTop: 8 },
-  content: { padding: SIZES.paddingSmall },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { padding: SIZES.padding, paddingBottom: 32 },
+  total: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 16 },
   card: {
-    flex: 1,
-    margin: SIZES.paddingSmall,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.card,
     borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    height: 80,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.07,
     shadowRadius: 6,
     elevation: 3,
   },
-  photo: { width: '100%', height: 130 },
-  cardInfo: { padding: 10 },
-  name: { fontSize: 13, fontWeight: '800' },
-  scientific: { fontSize: 11, fontStyle: 'italic', color: COLORS.textSecondary, marginTop: 1 },
-  subcategory: { fontSize: 10, color: COLORS.textSecondary, marginTop: 3, textTransform: 'capitalize' },
+  iconArea: { width: 72, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 30 },
+  info: { flex: 1, paddingHorizontal: 14 },
+  subName: { fontSize: 16, fontWeight: '800' },
+  count: { fontSize: 13, color: COLORS.textSecondary, marginTop: 3 },
 });

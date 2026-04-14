@@ -4,7 +4,7 @@
     {
       "name": "Expo Dev Server",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--tunnel", "--clear", "--port", "8083"],
+      "runtimeArgs": ["expo", "start", "--lan", "--clear", "--port", "8083"],
       "port": 8083,
       "autoPort": false
     },

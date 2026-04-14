@@ -53,7 +53,19 @@ export default function ScanningScreen() {
           );
           return;
         }
-        const result = await identifyAnimal(params.base64, apiKey);
+        // Retry once on server overload errors
+        let result;
+        try {
+          result = await identifyAnimal(params.base64, apiKey);
+        } catch (firstErr: any) {
+          const status = firstErr.response?.status;
+          if (status === 503 || status === 429 || firstErr.message?.toLowerCase().includes('overload')) {
+            await new Promise(r => setTimeout(r, 3000));
+            result = await identifyAnimal(params.base64, apiKey);
+          } else {
+            throw firstErr;
+          }
+        }
         if (!result.isAnimal) {
           Alert.alert('No Animal Found', 'Could not identify an animal. Try again!', [
             { text: 'Try Again', onPress: () => navigation.goBack() },
@@ -83,7 +95,7 @@ export default function ScanningScreen() {
         <View style={styles.radarOuter}>
           <View style={styles.radarMid} />
           <View style={styles.radarInner} />
-          <Animated.View style={[styles.sweep, { transform: [{ rotate: spin }] }]} />
+          <Animated.View style={[styles.sweep, { transform: [{ rotate: spin }, { translateX: 50 }] }]} />
         </View>
         <Text style={styles.paw}>🐾</Text>
       </View>
@@ -129,8 +141,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 2,
     backgroundColor: COLORS.primary,
-    top: 99,
-    left: 100,
     opacity: 0.9,
   },
   paw: { position: 'absolute', fontSize: 32, zIndex: 2 },

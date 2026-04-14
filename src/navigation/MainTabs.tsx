@@ -12,6 +12,7 @@ import ScanningScreen from '../screens/camera/ScanningScreen';
 import AnimalCardScreen from '../screens/camera/AnimalCardScreen';
 import CollectionsScreen from '../screens/collections/CollectionsScreen';
 import CategoryScreen from '../screens/collections/CategoryScreen';
+import SubcategoryScreen from '../screens/collections/SubcategoryScreen';
 import AnimalDetailScreen from '../screens/collections/AnimalDetailScreen';
 import FriendsScreen from '../screens/friends/FriendsScreen';
 import FriendProfileScreen from '../screens/friends/FriendProfileScreen';
@@ -51,6 +52,11 @@ function CollectionsNavigator() {
         name="Category"
         component={CategoryScreen}
         options={({ route }) => ({ title: route.params.category.charAt(0).toUpperCase() + route.params.category.slice(1) + ' Animals' })}
+      />
+      <CollectionsStack.Screen
+        name="Subcategory"
+        component={SubcategoryScreen}
+        options={({ route }) => ({ title: route.params.subcategory.charAt(0).toUpperCase() + route.params.subcategory.slice(1) })}
       />
       <CollectionsStack.Screen name="AnimalDetail" component={AnimalDetailScreen} options={{ title: 'Animal Detail' }} />
     </CollectionsStack.Navigator>

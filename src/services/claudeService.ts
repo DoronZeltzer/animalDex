@@ -2,7 +2,7 @@ import axios from 'axios';
 import { AnimalIdentification } from '../types/animal';
 import { mapToCategory } from '../utils/animalUtils';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 const PROMPT = `You are an expert wildlife biologist. Look at this image and identify the animal. Respond with ONLY a valid JSON object — no markdown, no explanation, just raw JSON.
 
