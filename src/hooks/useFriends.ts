@@ -1,45 +1,76 @@
 import { useEffect, useState } from 'react';
 import { UserProfile, LeaderboardEntry } from '../types/user';
-import { getFriendProfiles, getLeaderboard, subscribeToUserProfile } from '../services/firestoreService';
+import {
+  getFriendProfiles,
+  getLeaderboard,
+  subscribeToUserProfile,
+  subscribeToIncomingRequests,
+  subscribeToSentRequests,
+  finalizeAcceptedRequest,
+  FriendRequest,
+} from '../services/firestoreService';
 import { useAuth } from '../context/AuthContext';
 
 export function useFriends() {
   const { user } = useAuth();
   const [friends, setFriends] = useState<UserProfile[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
+  const [sentRequestUids, setSentRequestUids] = useState<string[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load leaderboard independently on mount
+  // Leaderboard
   useEffect(() => {
     if (!user) return;
-    getLeaderboard()
-      .then(setLeaderboard)
-      .catch(() => {});
+    getLeaderboard().then(setLeaderboard).catch(() => {});
   }, [user]);
 
-  // Load profile + friends
+  // Profile → friends list
   useEffect(() => {
     if (!user) { setLoading(false); return; }
 
-    const unsub = subscribeToUserProfile(user.uid, async (p) => {
+    const unsubProfile = subscribeToUserProfile(user.uid, async (p) => {
       try {
-        setProfile(p);
-        const friendProfiles = await getFriendProfiles(p.friends ?? []);
+        const [friendProfiles, board] = await Promise.all([
+          getFriendProfiles(p.friends ?? []),
+          getLeaderboard(),
+        ]);
         setFriends(friendProfiles);
-        // Refresh leaderboard when profile updates
-        const board = await getLeaderboard();
         setLeaderboard(board);
-      } catch (e) {
-        // silently ignore
-      } finally {
+      } catch {} finally {
         setLoading(false);
       }
     });
 
     const fallback = setTimeout(() => setLoading(false), 3000);
-    return () => { unsub(); clearTimeout(fallback); };
+    return () => { unsubProfile(); clearTimeout(fallback); };
   }, [user]);
 
-  return { friends, leaderboard, profile, loading };
+  // Incoming requests (pending = show in UI, accepted = auto-finalize)
+  useEffect(() => {
+    if (!user) return;
+
+    const unsub = subscribeToIncomingRequests(user.uid, (requests) => {
+      const pending = requests.filter((r) => r.type === 'pending');
+      const accepted = requests.filter((r) => r.type === 'accepted');
+
+      setPendingRequests(pending);
+
+      // Auto-finalize: add each acceptor to my friends and clean up
+      accepted.forEach((req) => {
+        finalizeAcceptedRequest(req.id, user.uid, req.fromUid).catch(() => {});
+      });
+    });
+
+    return unsub;
+  }, [user]);
+
+  // Sent (outgoing) requests — track which UIDs I've already sent to
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeToSentRequests(user.uid, setSentRequestUids);
+    return unsub;
+  }, [user]);
+
+  return { friends, pendingRequests, sentRequestUids, leaderboard, loading };
 }

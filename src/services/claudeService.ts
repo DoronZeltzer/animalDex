@@ -4,25 +4,17 @@ import { mapToCategory } from '../utils/animalUtils';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
-const PROMPT = `You are an expert wildlife biologist. Look at this image and identify the animal. Respond with ONLY a valid JSON object — no markdown, no explanation, just raw JSON.
+const PROMPT = `You are an expert wildlife biologist. Identify the animal in this image.
 
-If the image does NOT contain an animal, return: {"isAnimal": false}
+CRITICAL: Your entire response must be a single raw JSON object. No markdown, no code fences, no explanation text before or after. Start your response with { and end with }.
 
-If it DOES contain an animal, return this exact structure:
-{
-  "isAnimal": true,
-  "commonName": "string",
-  "scientificName": "string",
-  "category": "land" or "sea" or "air",
-  "subcategory": "string (e.g. dogs, fish, eagles)",
-  "breed": "string or null",
-  "lifespan": "string (e.g. 10-13 years)",
-  "averageSize": "string (e.g. 60-90 cm)",
-  "weight": "string (e.g. 20-30 kg)",
-  "history": "2-3 sentences about the animal's origin, habitat, and behavior.",
-  "funFact": "One interesting fun fact about this animal.",
-  "confidence": 0.0 to 1.0
-}`;
+If no animal is visible: {"isAnimal":false}
+
+If an animal is visible:
+{"isAnimal":true,"commonName":"...","scientificName":"...","category":"land","subcategory":"dogs","breed":null,"lifespan":"10-13 years","averageSize":"60-90 cm","weight":"20-30 kg","history":"2-3 sentences about origin, habitat, behavior.","funFact":"One fun fact.","confidence":0.9}
+
+category must be exactly one of: land, sea, air
+breed should be null if unknown or not applicable`;
 
 export async function identifyAnimal(
   base64Image: string,
@@ -66,18 +58,32 @@ export async function identifyAnimal(
   const text: string = candidate.content?.parts?.[0]?.text?.trim() ?? '';
   if (!text) throw new Error('Empty response from Gemini.');
 
-  // Strip markdown code fences if present, extract first JSON object
-  let clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```[\s\S]*$/i, '').trim();
+  // Aggressively clean and extract JSON
+  let clean = text
+    .replace(/```json\s*/gi, '')   // strip ```json
+    .replace(/```\s*/gi, '')        // strip ```
+    .trim();
 
-  // Extract JSON object/array if surrounded by extra text
-  const jsonMatch = clean.match(/\{[\s\S]*\}/);
-  if (jsonMatch) clean = jsonMatch[0];
+  // Find the outermost { ... } block
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    clean = clean.slice(start, end + 1);
+  }
 
   let parsed: any;
   try {
     parsed = JSON.parse(clean);
   } catch {
-    throw new Error(`Could not parse response. Raw: ${clean.slice(0, 100)}`);
+    // Last resort: try to fix common issues (trailing commas, single quotes)
+    try {
+      const fixed = clean
+        .replace(/,\s*([}\]])/g, '$1')   // remove trailing commas
+        .replace(/'/g, '"');              // replace single quotes
+      parsed = JSON.parse(fixed);
+    } catch {
+      throw new Error(`Could not parse response: ${text.slice(0, 120)}`);
+    }
   }
 
   if (!parsed.isAnimal) {

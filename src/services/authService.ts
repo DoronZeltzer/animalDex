@@ -22,6 +22,8 @@ async function createUserProfile(uid: string, displayName: string, email: string
     airCount: 0,
     achievements: [],
     friends: [],
+    pendingRequests: [],
+    sentRequests: [],
     createdAt: serverTimestamp(),
   };
   await setDoc(doc(db, 'users', uid), profile);

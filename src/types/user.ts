@@ -9,6 +9,8 @@ export interface UserProfile {
   airCount: number;
   achievements: string[];
   friends: string[];
+  pendingRequests: string[];  // incoming: UIDs who sent you a request
+  sentRequests: string[];     // outgoing: UIDs you sent a request to
   createdAt: any; // Firestore Timestamp
 }
 

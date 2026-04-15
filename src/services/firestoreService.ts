@@ -4,6 +4,7 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  deleteDoc,
   updateDoc,
   increment,
   query as firestoreQuery,
@@ -88,16 +89,83 @@ export async function hasAnimal(uid: string, commonName: string): Promise<boolea
 
 // ── Friends ───────────────────────────────────────────────────────────────────
 
-export async function addFriend(uid: string, friendUid: string): Promise<void> {
-  await setDoc(doc(db, 'users', uid), {
-    friends: arrayUnion(friendUid),
-  }, { merge: true });
+export interface FriendRequest {
+  id: string;
+  fromUid: string;
+  toUid: string;
+  fromName: string;
+  type: 'pending' | 'accepted';
+  createdAt: any;
+}
+
+// Send a friend request — writes only to friendRequests collection (no cross-user writes)
+export async function sendFriendRequest(myUid: string, targetUid: string, myName: string): Promise<void> {
+  const requestId = `${myUid}_${targetUid}`;
+  await setDoc(doc(db, 'friendRequests', requestId), {
+    fromUid: myUid,
+    toUid: targetUid,
+    fromName: myName,
+    type: 'pending',
+    createdAt: serverTimestamp(),
+  });
+}
+
+// Accept: delete the pending request, add requester to my friends,
+// create an 'accepted' notification so requester adds me back automatically
+export async function acceptFriendRequest(
+  requestId: string,
+  myUid: string,
+  myName: string,
+  requesterUid: string
+): Promise<void> {
+  await Promise.all([
+    deleteDoc(doc(db, 'friendRequests', requestId)),
+    setDoc(doc(db, 'users', myUid), { friends: arrayUnion(requesterUid) }, { merge: true }),
+    addDoc(collection(db, 'friendRequests'), {
+      fromUid: myUid,
+      toUid: requesterUid,
+      fromName: myName,
+      type: 'accepted',
+      createdAt: serverTimestamp(),
+    }),
+  ]);
+}
+
+// Decline: just delete the request
+export async function declineFriendRequest(requestId: string): Promise<void> {
+  await deleteDoc(doc(db, 'friendRequests', requestId));
+}
+
+// Called by requester when they see their 'accepted' notification:
+// add the acceptor to their own friends, then delete the notification
+export async function finalizeAcceptedRequest(notificationId: string, myUid: string, acceptorUid: string): Promise<void> {
+  await Promise.all([
+    setDoc(doc(db, 'users', myUid), { friends: arrayUnion(acceptorUid) }, { merge: true }),
+    deleteDoc(doc(db, 'friendRequests', notificationId)),
+  ]);
+}
+
+// Real-time listener: all friendRequests where I am the recipient
+export function subscribeToIncomingRequests(myUid: string, onUpdate: (requests: FriendRequest[]) => void): Unsubscribe {
+  const q = firestoreQuery(collection(db, 'friendRequests'), where('toUid', '==', myUid));
+  return onSnapshot(q, (snap) => {
+    onUpdate(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest)));
+  });
+}
+
+// Real-time listener: pending requests I sent
+export function subscribeToSentRequests(myUid: string, onUpdate: (targetUids: string[]) => void): Unsubscribe {
+  const q = firestoreQuery(collection(db, 'friendRequests'), where('fromUid', '==', myUid), where('type', '==', 'pending'));
+  return onSnapshot(q, (snap) => {
+    onUpdate(snap.docs.map((d) => d.data().toUid as string));
+  });
 }
 
 export async function removeFriend(uid: string, friendUid: string): Promise<void> {
-  await setDoc(doc(db, 'users', uid), {
-    friends: arrayRemove(friendUid),
-  }, { merge: true });
+  await Promise.all([
+    setDoc(doc(db, 'users', uid), { friends: arrayRemove(friendUid) }, { merge: true }),
+    setDoc(doc(db, 'users', friendUid), { friends: arrayRemove(uid) }, { merge: true }),
+  ]);
 }
 
 export async function searchUsers(query: string, currentUid: string): Promise<UserProfile[]> {
