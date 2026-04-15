@@ -89,7 +89,7 @@ export default function CategoryScreen() {
               <Text style={styles.emoji}>{CATEGORY_EMOJIS[params.category]?.[sub] ?? '🐾'}</Text>
             </View>
             <View style={styles.info}>
-              <Text style={[styles.subName, { color: CATEGORY_COLOR }]}>{sub.charAt(0).toUpperCase() + sub.slice(1)}</Text>
+              <Text style={[styles.subName, { color: CATEGORY_COLOR }]}>{(sub ?? 'Other').charAt(0).toUpperCase() + (sub ?? 'other').slice(1)}</Text>
               <Text style={styles.count}>{grouped[sub]} collected</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} style={{ marginRight: 14 }} />

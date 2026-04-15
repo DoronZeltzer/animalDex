@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { UserProfile, LeaderboardEntry } from '../types/user';
-import { getFriendProfiles, getLeaderboard } from '../services/firestoreService';
-import { subscribeToUserProfile } from '../services/firestoreService';
+import { getFriendProfiles, getLeaderboard, subscribeToUserProfile } from '../services/firestoreService';
 import { useAuth } from '../context/AuthContext';
 
 export function useFriends() {
@@ -11,17 +10,35 @@ export function useFriends() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Load leaderboard independently on mount
   useEffect(() => {
     if (!user) return;
+    getLeaderboard()
+      .then(setLeaderboard)
+      .catch(() => {});
+  }, [user]);
+
+  // Load profile + friends
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+
     const unsub = subscribeToUserProfile(user.uid, async (p) => {
-      setProfile(p);
-      const friendProfiles = await getFriendProfiles(p.friends ?? []);
-      setFriends(friendProfiles);
-      const board = await getLeaderboard([user.uid, ...(p.friends ?? [])]);
-      setLeaderboard(board);
-      setLoading(false);
+      try {
+        setProfile(p);
+        const friendProfiles = await getFriendProfiles(p.friends ?? []);
+        setFriends(friendProfiles);
+        // Refresh leaderboard when profile updates
+        const board = await getLeaderboard();
+        setLeaderboard(board);
+      } catch (e) {
+        // silently ignore
+      } finally {
+        setLoading(false);
+      }
     });
-    return unsub;
+
+    const fallback = setTimeout(() => setLoading(false), 3000);
+    return () => { unsub(); clearTimeout(fallback); };
   }, [user]);
 
   return { friends, leaderboard, profile, loading };

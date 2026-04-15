@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, FlatList, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { FriendsStackParamList } from '../../types/navigation';
-import { getUserProfile } from '../../services/firestoreService';
-import { subscribeToUserAnimals } from '../../services/firestoreService';
+import { getUserProfile, removeFriend } from '../../services/firestoreService';
+import { useAuth } from '../../context/AuthContext';
 import { UserProfile } from '../../types/user';
-import { CollectedAnimal } from '../../types/animal';
 import { COLORS, SIZES } from '../../config/constants';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,18 +13,42 @@ type Route = RouteProp<FriendsStackParamList, 'FriendProfile'>;
 export default function FriendProfileScreen() {
   const navigation = useNavigation<any>();
   const { params } = useRoute<Route>();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [animals, setAnimals] = useState<CollectedAnimal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
-    getUserProfile(params.friendId).then(setProfile);
-    const unsub = subscribeToUserAnimals(params.friendId, null, (a) => {
-      setAnimals(a);
+    getUserProfile(params.friendId).then((p) => {
+      setProfile(p);
       setLoading(false);
-    });
-    return unsub;
+    }).catch(() => setLoading(false));
   }, [params.friendId]);
+
+  const handleRemoveFriend = () => {
+    Alert.alert(
+      'Remove Friend',
+      `Remove ${params.friendName ?? 'this friend'} from your friends list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            if (!user) return;
+            setRemoving(true);
+            try {
+              await removeFriend(user.uid, params.friendId);
+              navigation.goBack();
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not remove friend.');
+              setRemoving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) return <View style={styles.loading}><ActivityIndicator color={COLORS.primary} size="large" /></View>;
 
@@ -34,17 +57,33 @@ export default function FriendProfileScreen() {
       {/* Profile header */}
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{params.friendName.charAt(0).toUpperCase()}</Text>
+          <Text style={styles.avatarText}>{(params.friendName ?? 'F').charAt(0).toUpperCase()}</Text>
         </View>
         <Text style={styles.name}>{params.friendName}</Text>
-        <Text style={styles.subtext}>{animals.length} animals discovered</Text>
-        <TouchableOpacity
-          style={styles.chatBtn}
-          onPress={() => navigation.navigate('Chat', { friendId: params.friendId, friendName: params.friendName })}
-        >
-          <Ionicons name="chatbubble" size={16} color={COLORS.white} />
-          <Text style={styles.chatBtnText}>Chat</Text>
-        </TouchableOpacity>
+        <Text style={styles.subtext}>{profile?.totalAnimals ?? 0} animals discovered</Text>
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={styles.chatBtn}
+            onPress={() => navigation.navigate('Chat', { friendId: params.friendId, friendName: params.friendName })}
+          >
+            <Ionicons name="chatbubble" size={16} color={COLORS.white} />
+            <Text style={styles.chatBtnText}>Chat</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={handleRemoveFriend}
+            disabled={removing}
+          >
+            {removing
+              ? <ActivityIndicator size="small" color={COLORS.error} />
+              : <>
+                  <Ionicons name="person-remove-outline" size={16} color={COLORS.error} />
+                  <Text style={styles.removeBtnText}>Remove</Text>
+                </>
+            }
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Stats */}
@@ -54,17 +93,6 @@ export default function FriendProfileScreen() {
         <StatCard label="Air" count={profile?.airCount ?? 0} color={COLORS.air} emoji="💨" />
       </View>
 
-      {/* Recent animals */}
-      <Text style={styles.sectionTitle}>Recent Discoveries</Text>
-      {animals.slice(0, 6).map((a) => (
-        <View key={a.animalId} style={styles.animalRow}>
-          <Image source={{ uri: a.photoURL }} style={styles.animalThumb} />
-          <View>
-            <Text style={styles.animalName}>{a.commonName}</Text>
-            <Text style={styles.animalSci}>{a.scientificName}</Text>
-          </View>
-        </View>
-      ))}
     </ScrollView>
   );
 }
@@ -88,16 +116,14 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 36, color: COLORS.white, fontWeight: '900' },
   name: { fontSize: 24, fontWeight: '900', color: COLORS.text, marginTop: 12 },
   subtext: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
-  chatBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 8, marginTop: 12, gap: 6 },
+  btnRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  chatBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 8, gap: 6 },
   chatBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 14 },
+  removeBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, gap: 6, borderWidth: 1.5, borderColor: COLORS.error },
+  removeBtnText: { color: COLORS.error, fontWeight: '700', fontSize: 14 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1.5, padding: 12, alignItems: 'center', gap: 2 },
   statEmoji: { fontSize: 20 },
   statCount: { fontSize: 22, fontWeight: '900' },
   statLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: COLORS.text, marginBottom: 12 },
-  animalRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.card, borderRadius: 14, padding: 10, marginBottom: 8 },
-  animalThumb: { width: 50, height: 50, borderRadius: 10 },
-  animalName: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  animalSci: { fontSize: 11, fontStyle: 'italic', color: COLORS.textSecondary },
 });

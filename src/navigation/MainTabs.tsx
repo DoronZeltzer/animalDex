@@ -51,12 +51,12 @@ function CollectionsNavigator() {
       <CollectionsStack.Screen
         name="Category"
         component={CategoryScreen}
-        options={({ route }) => ({ title: route.params.category.charAt(0).toUpperCase() + route.params.category.slice(1) + ' Animals' })}
+        options={({ route }) => ({ title: (route.params?.category ?? 'Animals').charAt(0).toUpperCase() + (route.params?.category ?? 'animals').slice(1) + ' Animals' })}
       />
       <CollectionsStack.Screen
         name="Subcategory"
         component={SubcategoryScreen}
-        options={({ route }) => ({ title: route.params.subcategory.charAt(0).toUpperCase() + route.params.subcategory.slice(1) })}
+        options={({ route }) => ({ title: (route.params?.subcategory ?? 'Animals').charAt(0).toUpperCase() + (route.params?.subcategory ?? 'animals').slice(1) })}
       />
       <CollectionsStack.Screen name="AnimalDetail" component={AnimalDetailScreen} options={{ title: 'Animal Detail' }} />
     </CollectionsStack.Navigator>

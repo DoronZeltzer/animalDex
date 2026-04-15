@@ -77,7 +77,7 @@ export default function AnimalCardScreen() {
         scientificName: identification.scientificName,
         category: identification.category,
         subcategory: identification.subcategory,
-        breed: identification.breed ?? null,
+        breed: identification.breed ?? undefined,
         photoURL,
         thumbnailURL: photoURL,
         lifespan: identification.lifespan,

@@ -117,7 +117,7 @@ function SettingsRow({ icon, label, onPress, color = COLORS.text }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SIZES.padding, paddingBottom: 40 },
+  content: { padding: SIZES.padding, paddingTop: 48, paddingBottom: 40 },
   header: { alignItems: 'center', marginBottom: 20 },
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 36, color: COLORS.white, fontWeight: '900' },

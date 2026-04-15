@@ -6,7 +6,7 @@ import {
   getDocs,
   updateDoc,
   increment,
-  query,
+  query as firestoreQuery,
   orderBy,
   onSnapshot,
   serverTimestamp,
@@ -14,6 +14,8 @@ import {
   addDoc,
   where,
   limit,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CollectedAnimal, AnimalCategory } from '../types/animal';
@@ -64,8 +66,8 @@ export function subscribeToUserAnimals(
 ): Unsubscribe {
   const animalsRef = collection(db, 'users', uid, 'animals');
   const q = category
-    ? query(animalsRef, where('category', '==', category))
-    : query(animalsRef, orderBy('capturedAt', 'desc'));
+    ? firestoreQuery(animalsRef, where('category', '==', category))
+    : firestoreQuery(animalsRef, orderBy('capturedAt', 'desc'));
 
   return onSnapshot(q, (snap) => {
     onUpdate(snap.docs.map((d) => d.data() as CollectedAnimal));
@@ -79,7 +81,7 @@ export async function getAnimalById(uid: string, animalId: string): Promise<Coll
 
 export async function hasAnimal(uid: string, commonName: string): Promise<boolean> {
   const animalsRef = collection(db, 'users', uid, 'animals');
-  const q = query(animalsRef, where('commonName', '==', commonName), limit(1));
+  const q = firestoreQuery(animalsRef, where('commonName', '==', commonName), limit(1));
   const snap = await getDocs(q);
   return !snap.empty;
 }
@@ -87,9 +89,28 @@ export async function hasAnimal(uid: string, commonName: string): Promise<boolea
 // ── Friends ───────────────────────────────────────────────────────────────────
 
 export async function addFriend(uid: string, friendUid: string): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), {
-    friends: ([] as string[]).concat([friendUid]),
-  });
+  await setDoc(doc(db, 'users', uid), {
+    friends: arrayUnion(friendUid),
+  }, { merge: true });
+}
+
+export async function removeFriend(uid: string, friendUid: string): Promise<void> {
+  await setDoc(doc(db, 'users', uid), {
+    friends: arrayRemove(friendUid),
+  }, { merge: true });
+}
+
+export async function searchUsers(query: string, currentUid: string): Promise<UserProfile[]> {
+  if (!query.trim()) return [];
+  const q = query.trim().toLowerCase();
+  const snap = await getDocs(collection(db, 'users'));
+  return snap.docs
+    .map((d) => d.data() as UserProfile)
+    .filter((u) =>
+      u.uid !== currentUid &&
+      (u.displayName?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+    )
+    .slice(0, 10);
 }
 
 export async function getFriendProfiles(friendUids: string[]): Promise<UserProfile[]> {
@@ -101,15 +122,22 @@ export async function getFriendProfiles(friendUids: string[]): Promise<UserProfi
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
 
-export async function getLeaderboard(friendUids: string[]): Promise<LeaderboardEntry[]> {
-  const entries: LeaderboardEntry[] = [];
-  for (const uid of friendUids) {
-    const snap = await getDoc(doc(db, 'leaderboard', uid));
-    if (snap.exists()) {
-      entries.push(snap.data() as LeaderboardEntry);
-    }
-  }
-  return entries.sort((a, b) => b.totalAnimals - a.totalAnimals).map((e, i) => ({ ...e, rank: i + 1 }));
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const usersSnap = await getDocs(collection(db, 'users'));
+  const entries: LeaderboardEntry[] = usersSnap.docs.map((d) => {
+    const data = d.data() as any;
+    return {
+      uid: data.uid,
+      displayName: data.displayName ?? 'Explorer',
+      photoURL: data.photoURL ?? '',
+      totalAnimals: data.totalAnimals ?? 0,
+      weeklyCaptures: 0,
+      rank: 0,
+    };
+  });
+  return entries
+    .sort((a, b) => b.totalAnimals - a.totalAnimals)
+    .map((e, i) => ({ ...e, rank: i + 1 }));
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -124,7 +152,7 @@ export function subscribeToChat(
   onMessages: (messages: any[]) => void
 ): Unsubscribe {
   const chatId = getChatId(myUid, friendUid);
-  const q = query(
+  const q = firestoreQuery(
     collection(db, 'chats', chatId, 'messages'),
     orderBy('sentAt', 'asc')
   );
