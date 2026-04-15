@@ -71,24 +71,26 @@ export default function AnimalCardScreen() {
       const animalId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const photoURL = photoUri;
 
-      await addAnimalToCollection(user.uid, {
+      const animalData: any = {
         animalId,
         commonName: identification.commonName,
         scientificName: identification.scientificName,
         category: identification.category,
-        subcategory: identification.subcategory,
-        breed: identification.breed ?? undefined,
+        subcategory: identification.subcategory ?? 'other',
         photoURL,
         thumbnailURL: photoURL,
-        lifespan: identification.lifespan,
-        averageSize: identification.averageSize,
-        weight: identification.weight,
-        history: identification.history,
-        funFact: identification.funFact,
+        lifespan: identification.lifespan ?? '',
+        averageSize: identification.averageSize ?? '',
+        weight: identification.weight ?? '',
+        history: identification.history ?? '',
+        funFact: identification.funFact ?? '',
         capturedAt: serverTimestamp(),
-        claudeConfidence: identification.confidence,
+        claudeConfidence: identification.confidence ?? 0,
         isFirstCapture: true,
-      });
+      };
+      if (identification.breed) animalData.breed = identification.breed;
+
+      await addAnimalToCollection(user.uid, animalData);
 
       setSaved(true);
       showToast();
