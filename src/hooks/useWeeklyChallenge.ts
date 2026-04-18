@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
+import { onSnapshot, doc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import * as Location from 'expo-location';
 import { useAuth } from '../context/AuthContext';
-import { getRegionForCountry, ChallengeAnimal } from '../data/challengeAnimals';
-import { Region } from '../data/challengeAnimals';
+import { getRegionForCountry, ChallengeAnimal, Region } from '../data/challengeAnimals';
 import { getWeeklyChallenge, getCurrentWeekId, daysLeftInWeek } from '../utils/challengeUtils';
-import { getChallengeCompletion } from '../services/firestoreService';
 
 export interface WeeklyChallengeState {
   challenge: ChallengeAnimal | null;
@@ -17,22 +17,24 @@ export interface WeeklyChallengeState {
 
 export function useWeeklyChallenge(): WeeklyChallengeState {
   const { user } = useAuth();
+  const weekId = getCurrentWeekId();
+
   const [state, setState] = useState<WeeklyChallengeState>({
     challenge: null,
-    weekId: getCurrentWeekId(),
+    weekId,
     region: 'europe',
     daysLeft: daysLeftInWeek(),
     completed: false,
     loading: true,
   });
 
+  // ── 1. Get location once and determine challenge ───────────────────────────
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function loadLocation() {
       try {
-        // 1. Get location permission (ask gently, don't block the app)
-        let countryCode = 'NL'; // sensible default
+        let countryCode = 'NL';
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
@@ -44,32 +46,34 @@ export function useWeeklyChallenge(): WeeklyChallengeState {
         }
 
         const region = getRegionForCountry(countryCode);
-        const weekId = getCurrentWeekId();
         const challenge = getWeeklyChallenge(region);
 
-        // 2. Check if user already completed this week's challenge
-        let completed = false;
-        if (user) {
-          const completion = await getChallengeCompletion(user.uid, weekId);
-          completed = !!completion;
-        }
-
         if (!cancelled) {
-          setState({ challenge, weekId, region, daysLeft: daysLeftInWeek(), completed, loading: false });
+          setState(prev => ({ ...prev, challenge, region, loading: false }));
         }
       } catch {
-        // Location failed — still show a challenge based on default region
-        const weekId = getCurrentWeekId();
         const challenge = getWeeklyChallenge('europe');
         if (!cancelled) {
-          setState({ challenge, weekId, region: 'europe', daysLeft: daysLeftInWeek(), completed: false, loading: false });
+          setState(prev => ({ ...prev, challenge, loading: false }));
         }
       }
     }
 
-    load();
+    loadLocation();
     return () => { cancelled = true; };
-  }, [user?.uid]);
+  }, []);
+
+  // ── 2. Subscribe to Firestore so completion updates in real-time ──────────
+  useEffect(() => {
+    if (!user || !db) return;
+
+    const ref = doc(db, 'users', user.uid, 'challenges', weekId);
+    const unsub = onSnapshot(ref, (snap) => {
+      setState(prev => ({ ...prev, completed: snap.exists() }));
+    }, () => {});
+
+    return () => unsub();
+  }, [user?.uid, weekId]);
 
   return state;
 }

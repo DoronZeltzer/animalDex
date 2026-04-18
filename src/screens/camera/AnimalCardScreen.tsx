@@ -27,6 +27,11 @@ export default function AnimalCardScreen() {
   const [saved, setSaved] = useState(false);
   const [challengeCompleted, setChallengeCompleted] = useState(false);
 
+  // Show toast only AFTER React has re-rendered with the correct challengeCompleted value
+  useEffect(() => {
+    if (saved) showToast();
+  }, [saved]);
+
   // Card reveal animation
   const cardScale = useRef(new Animated.Value(0.85)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
@@ -117,8 +122,7 @@ export default function AnimalCardScreen() {
         }
       } catch { /* challenge check is non-blocking */ }
 
-      setSaved(true);
-      showToast();
+      setSaved(true); // triggers the useEffect above which calls showToast()
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to save animal.');
       setSaving(false);
