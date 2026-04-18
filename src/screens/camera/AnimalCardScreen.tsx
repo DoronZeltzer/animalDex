@@ -6,7 +6,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CameraStackParamList } from '../../types/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { addAnimalToCollection, hasAnimal, completeChallenge, getChallengeCompletion } from '../../services/firestoreService';
+import { addAnimalToCollection, completeChallenge, getChallengeCompletion } from '../../services/firestoreService';
 import { getRegionForCountry } from '../../data/challengeAnimals';
 import { getWeeklyChallenge, getCurrentWeekId, matchesChallenge } from '../../utils/challengeUtils';
 import * as Location from 'expo-location';
@@ -67,18 +67,9 @@ export default function AnimalCardScreen() {
 
   const handleAddToCollection = async () => {
     if (!user || saving || saved) return;
+    setSaving(true);
     try {
-      setSaving(true);
-
-      const alreadyHas = await hasAnimal(user.uid, identification.commonName);
-      if (alreadyHas) {
-        Alert.alert('Already Collected!', `${identification.commonName} is already in your collection.`);
-        setSaving(false);
-        return;
-      }
-
       const animalId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const photoURL = photoUri;
 
       const animalData: any = {
         animalId,
@@ -86,8 +77,8 @@ export default function AnimalCardScreen() {
         scientificName: identification.scientificName,
         category: identification.category,
         subcategory: identification.subcategory ?? 'other',
-        photoURL,
-        thumbnailURL: photoURL,
+        photoURL: photoUri,
+        thumbnailURL: photoUri,
         lifespan: identification.lifespan ?? '',
         averageSize: identification.averageSize ?? '',
         weight: identification.weight ?? '',
@@ -101,7 +92,8 @@ export default function AnimalCardScreen() {
 
       await addAnimalToCollection(user.uid, animalData);
 
-      // ── Check weekly challenge ─────────────────────────────────────────────
+      // ── Weekly challenge check (always runs, never blocks the save) ────────
+      let isChallenge = false;
       try {
         const weekId = getCurrentWeekId();
         const alreadyDone = await getChallengeCompletion(user.uid, weekId);
@@ -110,19 +102,25 @@ export default function AnimalCardScreen() {
           const { status } = await Location.getForegroundPermissionsAsync();
           if (status === 'granted') {
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-            const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            const [geo] = await Location.reverseGeocodeAsync({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+            });
             countryCode = geo?.isoCountryCode ?? 'NL';
           }
           const region = getRegionForCountry(countryCode);
           const challenge = getWeeklyChallenge(region);
           if (matchesChallenge(identification.commonName, challenge.name)) {
             await completeChallenge(user.uid, weekId, identification.commonName, animalId);
-            setChallengeCompleted(true);
+            isChallenge = true;
           }
         }
-      } catch { /* challenge check is non-blocking */ }
+      } catch (challengeErr: any) {
+        console.warn('Challenge check failed:', challengeErr?.message ?? challengeErr);
+      }
 
-      setSaved(true); // triggers the useEffect above which calls showToast()
+      setChallengeCompleted(isChallenge);
+      setSaved(true); // triggers useEffect → showToast()
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to save animal.');
       setSaving(false);
