@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { onSnapshot, collection } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { useGoldTheme } from '../../context/GoldThemeContext';
-import { getChallengeHistory, ChallengeCompletion } from '../../services/firestoreService';
+import { ChallengeCompletion } from '../../services/firestoreService';
 import { getRegionForCountry, Region } from '../../data/challengeAnimals';
 import { getWeeklyChallenge, getCurrentWeekId, getLastNWeekIds, weekIdToLabel } from '../../utils/challengeUtils';
 import { COLORS, SIZES } from '../../config/constants';
@@ -25,28 +28,42 @@ export default function WeeklyChallengesScreen() {
   const currentWeekId = getCurrentWeekId();
   const weekIds = getLastNWeekIds(8); // current + 7 past weeks
 
+  // ── Load region once ─────────────────────────────────────────────────────
   useEffect(() => {
-    async function load() {
-      // Get region
-      let country = 'NL';
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-        const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-        country = geo?.isoCountryCode ?? 'NL';
-      }
-      setRegion(getRegionForCountry(country));
+    (async () => {
+      try {
+        let country = 'NL';
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+          const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+          country = geo?.isoCountryCode ?? 'NL';
+        }
+        setRegion(getRegionForCountry(country));
+      } catch {}
+    })();
+  }, []);
 
-      // Load completed challenge history
-      if (user) {
-        const completions = await getChallengeHistory(user.uid);
+  // ── Real-time subscription to challenges subcollection ───────────────────
+  useEffect(() => {
+    if (!user || !db) { setLoading(false); return; }
+
+    const unsub = onSnapshot(
+      collection(db, 'users', user.uid, 'challenges'),
+      (snap) => {
         const map: Record<string, ChallengeCompletion> = {};
-        completions.forEach(c => { map[c.weekId] = c; });
+        snap.docs.forEach(d => {
+          const data = d.data() as ChallengeCompletion;
+          // Use doc ID as weekId fallback in case data.weekId is missing
+          map[data.weekId ?? d.id] = data;
+        });
         setHistory(map);
-      }
-      setLoading(false);
-    }
-    load();
+        setLoading(false);
+      },
+      () => { setLoading(false); }  // permission error → just show empty
+    );
+
+    return () => unsub();
   }, [user?.uid]);
 
   const totalCompleted = Object.keys(history).length;
