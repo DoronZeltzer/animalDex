@@ -29,6 +29,12 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AnimalDex uses your location to show you animals found in your region."
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "AnimalDex needs camera access to photograph and identify animals."

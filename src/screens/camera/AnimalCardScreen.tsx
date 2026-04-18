@@ -6,7 +6,10 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { CameraStackParamList } from '../../types/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { addAnimalToCollection, hasAnimal } from '../../services/firestoreService';
+import { addAnimalToCollection, hasAnimal, completeChallenge, getChallengeCompletion } from '../../services/firestoreService';
+import { getRegionForCountry } from '../../data/challengeAnimals';
+import { getWeeklyChallenge, getCurrentWeekId, matchesChallenge } from '../../utils/challengeUtils';
+import * as Location from 'expo-location';
 import { COLORS, SIZES } from '../../config/constants';
 import { getCategoryLabel } from '../../utils/animalUtils';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +25,7 @@ export default function AnimalCardScreen() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [challengeCompleted, setChallengeCompleted] = useState(false);
 
   // Card reveal animation
   const cardScale = useRef(new Animated.Value(0.85)).current;
@@ -92,6 +96,27 @@ export default function AnimalCardScreen() {
 
       await addAnimalToCollection(user.uid, animalData);
 
+      // ── Check weekly challenge ─────────────────────────────────────────────
+      try {
+        const weekId = getCurrentWeekId();
+        const alreadyDone = await getChallengeCompletion(user.uid, weekId);
+        if (!alreadyDone) {
+          let countryCode = 'NL';
+          const { status } = await Location.getForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+            const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            countryCode = geo?.isoCountryCode ?? 'NL';
+          }
+          const region = getRegionForCountry(countryCode);
+          const challenge = getWeeklyChallenge(region);
+          if (matchesChallenge(identification.commonName, challenge.name)) {
+            await completeChallenge(user.uid, weekId, identification.commonName, animalId);
+            setChallengeCompleted(true);
+          }
+        }
+      } catch { /* challenge check is non-blocking */ }
+
       setSaved(true);
       showToast();
     } catch (error: any) {
@@ -103,10 +128,12 @@ export default function AnimalCardScreen() {
   return (
     <>
       {/* Toast notification */}
-      <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }], opacity: toastOpacity }]}>
-        <Ionicons name="checkmark-circle" size={22} color={COLORS.white} />
+      <Animated.View style={[styles.toast, challengeCompleted && styles.toastChallenge, { transform: [{ translateY: toastY }], opacity: toastOpacity }]}>
+        <Ionicons name={challengeCompleted ? 'trophy' : 'checkmark-circle'} size={22} color={COLORS.white} />
         <Text style={styles.toastText}>
-          {identification.commonName} added to {identification.category} collection!
+          {challengeCompleted
+            ? `🏆 Weekly Challenge complete! You found the ${identification.commonName}!`
+            : `${identification.commonName} added to ${identification.category} collection!`}
         </Text>
       </Animated.View>
 
@@ -203,6 +230,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   toastText: { flex: 1, color: COLORS.white, fontSize: 14, fontWeight: '700' },
+  toastChallenge: { backgroundColor: '#D97706' },
   card: { backgroundColor: COLORS.card, borderRadius: 24, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 8 },
   photo: { width: '100%', height: 260 },
   categoryBadge: { position: 'absolute', top: 16, right: 16, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },

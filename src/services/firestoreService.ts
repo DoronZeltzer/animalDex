@@ -223,6 +223,29 @@ const entries: LeaderboardEntry[] = usersSnap.docs.map((d) => {
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }
 
+// ── Weekly Challenges ─────────────────────────────────────────────────────────
+
+export interface ChallengeCompletion {
+  weekId: string;
+  animalName: string;
+  animalId: string;
+  completedAt: any;
+}
+
+export async function completeChallenge(uid: string, weekId: string, animalName: string, animalId: string): Promise<void> {
+  await setDoc(doc(db, 'users', uid, 'challenges', weekId), {
+    weekId,
+    animalName,
+    animalId,
+    completedAt: serverTimestamp(),
+  });
+}
+
+export async function getChallengeCompletion(uid: string, weekId: string): Promise<ChallengeCompletion | null> {
+  const snap = await getDoc(doc(db, 'users', uid, 'challenges', weekId));
+  return snap.exists() ? (snap.data() as ChallengeCompletion) : null;
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 function getChatId(uid1: string, uid2: string): string {

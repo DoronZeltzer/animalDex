@@ -8,8 +8,10 @@ import { MainTabParamList, CameraStackParamList, CollectionsStackParamList, Frie
 import CameraButton from '../../components/home/CameraButton';
 import CategoryBook from '../../components/home/CategoryBook';
 import FriendStrip from '../../components/home/FriendStrip';
+import WeeklyChallengeCard from '../../components/home/WeeklyChallengeCard';
 import { useAuth } from '../../context/AuthContext';
 import { useCollection } from '../../hooks/useCollection';
+import { useWeeklyChallenge } from '../../hooks/useWeeklyChallenge';
 import { COLORS, SIZES } from '../../config/constants';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -19,6 +21,7 @@ export default function HomeScreen() {
   const { animals: landAnimals } = useCollection('land');
   const { animals: seaAnimals } = useCollection('sea');
   const { animals: airAnimals } = useCollection('air');
+  const weeklyChallenge = useWeeklyChallenge();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -52,6 +55,12 @@ export default function HomeScreen() {
       {/* Camera Button */}
       <View style={{ marginTop: 28 }}>
         <CameraButton onPress={() => navigation.navigate('CameraTab', { screen: 'Camera' })} />
+      </View>
+
+      {/* Weekly Challenge */}
+      <View style={{ marginTop: 28 }}>
+        <Text style={styles.sectionTitle}>Weekly Challenge</Text>
+        <WeeklyChallengeCard challenge={weeklyChallenge} />
       </View>
 
       {/* Friends Strip */}
