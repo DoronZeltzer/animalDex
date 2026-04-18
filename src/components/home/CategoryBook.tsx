@@ -11,7 +11,7 @@ const BOOK_CONFIG: Record<AnimalCategory, {
   label: string;
   emoji: string;
 }> = {
-  land: { color: COLORS.land, lightColor: COLORS.landLight, icon: 'leaf', label: 'Land', emoji: '🪨' },
+  land: { color: COLORS.land, lightColor: COLORS.landLight, icon: 'leaf', label: 'Land', emoji: '🌿' },
   sea:  { color: COLORS.sea,  lightColor: COLORS.seaLight,  icon: 'water', label: 'Sea',  emoji: '🌊' },
   air:  { color: COLORS.air,  lightColor: COLORS.airLight,  icon: 'cloud', label: 'Air',  emoji: '💨' },
 };
@@ -45,7 +45,6 @@ export default function CategoryBook({ category, count, onPress }: Props) {
         <View style={[styles.badge, { backgroundColor: config.color }]}>
           <Text style={styles.badgeText}>{count}</Text>
         </View>
-        <Text style={styles.emoji}>{config.emoji}</Text>
         <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
           <Ionicons name={config.icon} size={24} color={COLORS.white} />
         </View>

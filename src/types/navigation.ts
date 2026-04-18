@@ -26,6 +26,15 @@ export type FriendsStackParamList = {
   Friends: undefined;
   FriendProfile: { friendId: string; friendName: string };
   Chat: { friendId: string; friendName: string };
+  Trade: {
+    mode: 'offer' | 'accept';
+    friendId?: string;
+    friendName?: string;
+    tradeId?: string;
+    fromUid?: string;
+    fromName?: string;
+    offeredAnimal?: any;
+  };
 };
 
 export type ProfileStackParamList = {

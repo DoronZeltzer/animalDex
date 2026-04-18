@@ -32,7 +32,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export function subscribeToUserProfile(uid: string, onUpdate: (profile: UserProfile) => void): Unsubscribe {
   return onSnapshot(doc(db, 'users', uid), (snap) => {
     if (snap.exists()) onUpdate(snap.data() as UserProfile);
-  });
+  }, () => {});
 }
 
 // ── Animals ───────────────────────────────────────────────────────────────────
@@ -68,11 +68,14 @@ export function subscribeToUserAnimals(
   const animalsRef = collection(db, 'users', uid, 'animals');
   const q = category
     ? firestoreQuery(animalsRef, where('category', '==', category))
-    : firestoreQuery(animalsRef, orderBy('capturedAt', 'desc'));
+    : firestoreQuery(animalsRef);
 
   return onSnapshot(q, (snap) => {
-    onUpdate(snap.docs.map((d) => d.data() as CollectedAnimal));
-  });
+    const animals = snap.docs.map((d) => d.data() as CollectedAnimal);
+    // Sort client-side to avoid needing a composite index
+    if (!category) animals.sort((a, b) => (b.capturedAt?.seconds ?? 0) - (a.capturedAt?.seconds ?? 0));
+    onUpdate(animals);
+  }, () => { onUpdate([]); });
 }
 
 export async function getAnimalById(uid: string, animalId: string): Promise<CollectedAnimal | null> {
@@ -150,15 +153,18 @@ export function subscribeToIncomingRequests(myUid: string, onUpdate: (requests: 
   const q = firestoreQuery(collection(db, 'friendRequests'), where('toUid', '==', myUid));
   return onSnapshot(q, (snap) => {
     onUpdate(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FriendRequest)));
-  });
+  }, () => { onUpdate([]); });
 }
 
-// Real-time listener: pending requests I sent
+// Real-time listener: pending requests I sent (filter type client-side to avoid composite index)
 export function subscribeToSentRequests(myUid: string, onUpdate: (targetUids: string[]) => void): Unsubscribe {
-  const q = firestoreQuery(collection(db, 'friendRequests'), where('fromUid', '==', myUid), where('type', '==', 'pending'));
+  const q = firestoreQuery(collection(db, 'friendRequests'), where('fromUid', '==', myUid));
   return onSnapshot(q, (snap) => {
-    onUpdate(snap.docs.map((d) => d.data().toUid as string));
-  });
+    const pending = snap.docs
+      .filter((d) => d.data().type === 'pending')
+      .map((d) => d.data().toUid as string);
+    onUpdate(pending);
+  }, () => { onUpdate([]); });
 }
 
 export async function removeFriend(uid: string, friendUid: string): Promise<void> {
@@ -173,12 +179,21 @@ export async function searchUsers(query: string, currentUid: string): Promise<Us
   const q = query.trim().toLowerCase();
   const snap = await getDocs(collection(db, 'users'));
   return snap.docs
-    .map((d) => d.data() as UserProfile)
+    .map((d) => ({ uid: d.id, ...d.data() } as UserProfile))  // use doc ID as uid fallback
     .filter((u) =>
       u.uid !== currentUid &&
       (u.displayName?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
     )
     .slice(0, 10);
+}
+
+export async function isDisplayNameTaken(displayName: string, currentUid: string): Promise<boolean> {
+  const snap = await getDocs(collection(db, 'users'));
+  return snap.docs.some((d) => {
+    if (d.id === currentUid) return false;
+    const name = (d.data().displayName ?? '') as string;
+    return name.toLowerCase() === displayName.trim().toLowerCase();
+  });
 }
 
 export async function getFriendProfiles(friendUids: string[]): Promise<UserProfile[]> {
@@ -192,10 +207,10 @@ export async function getFriendProfiles(friendUids: string[]): Promise<UserProfi
 
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   const usersSnap = await getDocs(collection(db, 'users'));
-  const entries: LeaderboardEntry[] = usersSnap.docs.map((d) => {
+const entries: LeaderboardEntry[] = usersSnap.docs.map((d) => {
     const data = d.data() as any;
     return {
-      uid: data.uid,
+      uid: data.uid ?? d.id,           // fallback to document ID
       displayName: data.displayName ?? 'Explorer',
       photoURL: data.photoURL ?? '',
       totalAnimals: data.totalAnimals ?? 0,
@@ -226,7 +241,7 @@ export function subscribeToChat(
   );
   return onSnapshot(q, (snap) => {
     onMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  });
+  }, () => { onMessages([]); });
 }
 
 export async function sendMessage(myUid: string, friendUid: string, text: string): Promise<void> {
@@ -236,4 +251,65 @@ export async function sendMessage(myUid: string, friendUid: string, text: string
     text,
     sentAt: serverTimestamp(),
   });
+}
+
+// ── Trades ────────────────────────────────────────────────────────────────────
+
+export interface TradeRequest {
+  id: string;
+  fromUid: string;
+  toUid: string;
+  fromName: string;
+  offeredAnimal: CollectedAnimal;
+  status: 'pending';
+  createdAt: any;
+}
+
+export async function sendTradeRequest(
+  fromUid: string,
+  toUid: string,
+  fromName: string,
+  offeredAnimal: CollectedAnimal
+): Promise<void> {
+  // Strip undefined fields — Firestore rejects documents with undefined values
+  const cleanAnimal = Object.fromEntries(
+    Object.entries(offeredAnimal).filter(([, v]) => v !== undefined)
+  );
+  await addDoc(collection(db, 'tradeRequests'), {
+    fromUid, toUid, fromName, offeredAnimal: cleanAnimal, status: 'pending', createdAt: serverTimestamp(),
+  });
+}
+
+export async function acceptTradeRequest(
+  tradeId: string,
+  myUid: string,
+  friendUid: string,
+  myAnimal: CollectedAnimal,
+  theirAnimal: CollectedAnimal
+): Promise<void> {
+  await Promise.all([
+    deleteDoc(doc(db, 'tradeRequests', tradeId)),
+    deleteDoc(doc(db, 'users', myUid, 'animals', myAnimal.animalId)),
+    setDoc(doc(db, 'users', myUid, 'animals', theirAnimal.animalId), theirAnimal),
+    deleteDoc(doc(db, 'users', friendUid, 'animals', theirAnimal.animalId)),
+    setDoc(doc(db, 'users', friendUid, 'animals', myAnimal.animalId), myAnimal),
+  ]);
+}
+
+export async function declineTradeRequest(tradeId: string): Promise<void> {
+  await deleteDoc(doc(db, 'tradeRequests', tradeId));
+}
+
+export function subscribeToIncomingTrades(
+  myUid: string,
+  onUpdate: (trades: TradeRequest[]) => void
+): Unsubscribe {
+  const q = firestoreQuery(collection(db, 'tradeRequests'), where('toUid', '==', myUid));
+  return onSnapshot(q, (snap) => {
+    onUpdate(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as TradeRequest))
+        .filter((t) => t.status === 'pending')
+    );
+  }, () => { onUpdate([]); });
 }

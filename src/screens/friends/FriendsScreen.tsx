@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, TextInput, Animated, Easing } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useFriends } from '../../hooks/useFriends';
 import { COLORS, SIZES } from '../../config/constants';
 import { Ionicons } from '@expo/vector-icons';
-import { searchUsers, sendFriendRequest, acceptFriendRequest, declineFriendRequest, FriendRequest } from '../../services/firestoreService';
+import { searchUsers, sendFriendRequest, acceptFriendRequest, declineFriendRequest, FriendRequest, subscribeToIncomingTrades, declineTradeRequest, TradeRequest } from '../../services/firestoreService';
 import { useAuth } from '../../context/AuthContext';
 import { UserProfile } from '../../types/user';
 
@@ -17,6 +17,7 @@ export default function FriendsScreen() {
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [actingUid, setActingUid] = useState<string | null>(null);
+  const [tradeRequests, setTradeRequests] = useState<TradeRequest[]>([]);
 
   // Toast
   const [toastMessage, setToastMessage] = useState('');
@@ -39,6 +40,12 @@ export default function FriendsScreen() {
       }, 2500);
     });
   };
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeToIncomingTrades(user.uid, setTradeRequests);
+    return unsub;
+  }, [user]);
 
   const handleSearch = async (text: string) => {
     setQuery(text);
@@ -112,21 +119,34 @@ export default function FriendsScreen() {
             <View style={styles.leaderboardCard}>
               <Text style={styles.sectionTitle}>🏆 Leaderboard</Text>
               {leaderboard.length === 0 ? (
-                <Text style={styles.emptyText}>Add friends to see the leaderboard!</Text>
-              ) : (
-                leaderboard.slice(0, 5).map((entry) => (
-                  <View key={entry.uid} style={styles.lbRow}>
-                    <Text style={styles.lbRank}>#{entry.rank}</Text>
-                    <View style={styles.lbAvatar}>
-                      {entry.photoURL
-                        ? <Image source={{ uri: entry.photoURL }} style={styles.lbAvatarImg} />
-                        : <Text style={styles.lbAvatarText}>🧭</Text>}
+                <Text style={styles.emptyText}>No players yet!</Text>
+              ) : (() => {
+                const top5 = leaderboard.slice(0, 5);
+                const myEntry = leaderboard.find((e) => e.uid === user?.uid);
+                const myInTop5 = top5.some((e) => e.uid === user?.uid);
+                const rows = myEntry && !myInTop5 ? [...top5, myEntry] : top5;
+                return rows.map((entry, i) => {
+                  const isMe = entry.uid === user?.uid;
+                  const isSeparator = !myInTop5 && myEntry && i === 5;
+                  return (
+                    <View key={entry.uid ?? `lb-${i}`}>
+                      {isSeparator && <View style={styles.lbDivider} />}
+                      <View style={[styles.lbRow, isMe && styles.lbRowMe]}>
+                        <Text style={[styles.lbRank, isMe && styles.lbRankMe]}>#{entry.rank}</Text>
+                        <View style={styles.lbAvatar}>
+                          {entry.photoURL
+                            ? <Image source={{ uri: entry.photoURL }} style={styles.lbAvatarImg} />
+                            : <Text style={styles.lbAvatarText}>🧭</Text>}
+                        </View>
+                        <Text style={[styles.lbName, isMe && styles.lbNameMe]} numberOfLines={1}>
+                          {entry.displayName ?? 'Explorer'}{isMe ? ' (you)' : ''}
+                        </Text>
+                        <Text style={[styles.lbScore, isMe && styles.lbScoreMe]}>{entry.totalAnimals} 🐾</Text>
+                      </View>
                     </View>
-                    <Text style={styles.lbName} numberOfLines={1}>{entry.displayName ?? 'Explorer'}</Text>
-                    <Text style={styles.lbScore}>{entry.totalAnimals} 🐾</Text>
-                  </View>
-                ))
-              )}
+                  );
+                });
+              })()}
             </View>
 
             {/* Pending incoming requests */}
@@ -156,6 +176,44 @@ export default function FriendsScreen() {
                         style={styles.declineBtn}
                         onPress={() => handleDecline(req)}
                         disabled={!!actingUid}
+                      >
+                        <Ionicons name="close" size={18} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {tradeRequests.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: 20 }]}>🔄 Trade Requests</Text>
+                <View style={styles.requestsCard}>
+                  {tradeRequests.map((trade) => (
+                    <View key={trade.id} style={styles.requestRow}>
+                      <View style={styles.resultAvatar}>
+                        <Text style={styles.resultAvatarText}>🔄</Text>
+                      </View>
+                      <View style={styles.resultInfo}>
+                        <Text style={styles.resultName}>{trade.fromName}</Text>
+                        <Text style={styles.resultCount}>offering {trade.offeredAnimal?.commonName}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.acceptBtn}
+                        onPress={() => navigation.navigate('Trade', {
+                          mode: 'accept',
+                          tradeId: trade.id,
+                          fromUid: trade.fromUid,
+                          fromName: trade.fromName,
+                          offeredAnimal: trade.offeredAnimal,
+                        })}
+                        disabled={!!actingUid}
+                      >
+                        <Text style={styles.acceptBtnText}>View</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.declineBtn}
+                        onPress={() => declineTradeRequest(trade.id)}
                       >
                         <Ionicons name="close" size={18} color={COLORS.textSecondary} />
                       </TouchableOpacity>
@@ -287,7 +345,12 @@ const styles = StyleSheet.create({
   leaderboardCard: { backgroundColor: COLORS.card, borderRadius: 20, padding: 16, borderWidth: 1.5, borderColor: '#FFD54F' },
   emptyText: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
   lbRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
+  lbRowMe: { backgroundColor: COLORS.primary + '15', borderRadius: 10, paddingHorizontal: 6, marginHorizontal: -6 },
   lbRank: { fontSize: 15, fontWeight: '900', color: COLORS.secondary, width: 30 },
+  lbRankMe: { color: COLORS.primary },
+  lbNameMe: { color: COLORS.primary },
+  lbScoreMe: { color: COLORS.primary },
+  lbDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 6 },
   lbAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   lbAvatarText: { fontSize: 18 },
   lbAvatarImg: { width: 36, height: 36, borderRadius: 18 },

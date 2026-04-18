@@ -11,6 +11,7 @@ import FriendStrip from '../../components/home/FriendStrip';
 import { useAuth } from '../../context/AuthContext';
 import { useCollection } from '../../hooks/useCollection';
 import { COLORS, SIZES } from '../../config/constants';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
@@ -58,18 +59,18 @@ export default function HomeScreen() {
 
       {/* Stats row */}
       <View style={styles.statsRow}>
-        <StatCard emoji="🌿" label="Land" count={landAnimals.length} color={COLORS.land} />
-        <StatCard emoji="🌊" label="Sea" count={seaAnimals.length} color={COLORS.sea} />
-        <StatCard emoji="💨" label="Air" count={airAnimals.length} color={COLORS.air} />
+        <StatCard icon="leaf"  label="Land" count={landAnimals.length} color={COLORS.land} />
+        <StatCard icon="water" label="Sea"  count={seaAnimals.length}  color={COLORS.sea}  />
+        <StatCard icon="cloud" label="Air"  count={airAnimals.length}  color={COLORS.air}  />
       </View>
     </ScrollView>
   );
 }
 
-function StatCard({ emoji, label, count, color }: { emoji: string; label: string; count: number; color: string }) {
+function StatCard({ icon, label, count, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; count: number; color: string }) {
   return (
     <View style={[styles.statCard, { borderColor: color }]}>
-      <Text style={styles.statEmoji}>{emoji}</Text>
+      <Ionicons name={icon} size={20} color={color} />
       <Text style={[styles.statCount, { color }]}>{count}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>

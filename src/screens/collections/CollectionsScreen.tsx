@@ -74,7 +74,7 @@ export default function CollectionsScreen() {
       ) : (
         <>
           <CategoryCard
-            emoji="🌿"
+            icon="leaf"
             title="Land Animals"
             description="Mammals, reptiles, insects and more"
             count={land.length}
@@ -83,7 +83,7 @@ export default function CollectionsScreen() {
             onPress={() => navigation.navigate('Category', { category: 'land' })}
           />
           <CategoryCard
-            emoji="🌊"
+            icon="water"
             title="Sea Animals"
             description="Fish, mammals, and ocean creatures"
             count={sea.length}
@@ -92,7 +92,7 @@ export default function CollectionsScreen() {
             onPress={() => navigation.navigate('Category', { category: 'sea' })}
           />
           <CategoryCard
-            emoji="💨"
+            icon="cloud"
             title="Air Animals"
             description="Birds, bats, and flying insects"
             count={air.length}
@@ -106,11 +106,11 @@ export default function CollectionsScreen() {
   );
 }
 
-function CategoryCard({ emoji, title, description, count, color, lightColor, onPress }: any) {
+function CategoryCard({ icon, title, description, count, color, lightColor, onPress }: any) {
   return (
     <TouchableOpacity style={[styles.card, { borderColor: color }]} onPress={onPress} activeOpacity={0.85}>
       <View style={[styles.iconArea, { backgroundColor: lightColor }]}>
-        <Text style={styles.cardEmoji}>{emoji}</Text>
+        <Ionicons name={icon} size={28} color={color} />
       </View>
       <View style={styles.cardInfo}>
         <Text style={[styles.cardTitle, { color }]}>{title}</Text>

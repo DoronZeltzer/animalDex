@@ -17,7 +17,9 @@ import AnimalDetailScreen from '../screens/collections/AnimalDetailScreen';
 import FriendsScreen from '../screens/friends/FriendsScreen';
 import FriendProfileScreen from '../screens/friends/FriendProfileScreen';
 import ChatScreen from '../screens/friends/ChatScreen';
+import TradeScreen from '../screens/friends/TradeScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import SettingsScreen from '../screens/profile/SettingsScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -70,6 +72,7 @@ function FriendsNavigator() {
       <FriendsStack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }} />
       <FriendsStack.Screen name="FriendProfile" component={FriendProfileScreen} options={({ route }) => ({ title: route.params.friendName })} />
       <FriendsStack.Screen name="Chat" component={ChatScreen} options={({ route }) => ({ title: route.params.friendName })} />
+      <FriendsStack.Screen name="Trade" component={TradeScreen} options={({ route }) => ({ title: route.params.mode === 'offer' ? 'Make a Trade' : 'Accept Trade' })} />
     </FriendsStack.Navigator>
   );
 }
@@ -79,6 +82,7 @@ function ProfileNavigator() {
   return (
     <ProfileStack.Navigator screenOptions={{ headerTintColor: COLORS.primary }}>
       <ProfileStack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
     </ProfileStack.Navigator>
   );
 }

@@ -1,45 +1,27 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useCollection } from '../../hooks/useCollection';
 import { COLORS, SIZES } from '../../config/constants';
 import { ACHIEVEMENTS } from '../../types/user';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
-
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { animals: land } = useCollection('land');
   const { animals: sea } = useCollection('sea');
   const { animals: air } = useCollection('air');
 
   const total = land.length + sea.length + air.length;
 
-  const handleSetApiKey = async () => {
-    Alert.prompt(
-      'Anthropic API Key',
-      'Enter your Anthropic API key to enable animal identification.',
-      async (key) => {
-        if (key) {
-          await SecureStore.setItemAsync('ANTHROPIC_API_KEY', key.trim());
-          Alert.alert('Saved', 'API key saved securely.');
-        }
-      },
-      'secure-text'
-    );
-  };
-
-  const handleLogout = async () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: logout },
-    ]);
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Gear icon */}
+      <TouchableOpacity style={styles.gearBtn} onPress={() => navigation.navigate('Settings')}>
+        <Ionicons name="settings-outline" size={24} color={COLORS.textSecondary} />
+      </TouchableOpacity>
+
       {/* Profile header */}
       <View style={styles.header}>
         <View style={styles.avatar}>
@@ -51,9 +33,9 @@ export default function ProfileScreen() {
 
       {/* Stats */}
       <View style={styles.statsRow}>
-        <StatCard emoji="🌿" label="Land" count={land.length} color={COLORS.land} />
-        <StatCard emoji="🌊" label="Sea" count={sea.length} color={COLORS.sea} />
-        <StatCard emoji="💨" label="Air" count={air.length} color={COLORS.air} />
+        <StatCard icon="leaf"  label="Land" count={land.length} color={COLORS.land} />
+        <StatCard icon="water" label="Sea"  count={sea.length}  color={COLORS.sea}  />
+        <StatCard icon="cloud" label="Air"  count={air.length}  color={COLORS.air}  />
       </View>
       <View style={styles.totalCard}>
         <Text style={styles.totalEmoji}>🐾</Text>
@@ -84,40 +66,25 @@ export default function ProfileScreen() {
         })}
       </View>
 
-      {/* Settings */}
-      <Text style={styles.sectionTitle}>Settings</Text>
-      <View style={styles.settingsCard}>
-        <SettingsRow icon="key-outline" label="Set API Key" onPress={handleSetApiKey} />
-        <View style={styles.divider} />
-        <SettingsRow icon="log-out-outline" label="Sign Out" onPress={handleLogout} color={COLORS.error} />
-      </View>
     </ScrollView>
   );
 }
 
-function StatCard({ emoji, label, count, color }: any) {
+function StatCard({ icon, label, count, color }: any) {
   return (
     <View style={[styles.statCard, { borderColor: color }]}>
-      <Text style={styles.statEmoji}>{emoji}</Text>
+      <Ionicons name={icon} size={20} color={color} />
       <Text style={[styles.statCount, { color }]}>{count}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-function SettingsRow({ icon, label, onPress, color = COLORS.text }: any) {
-  return (
-    <TouchableOpacity style={styles.settingsRow} onPress={onPress}>
-      <Ionicons name={icon} size={20} color={color} />
-      <Text style={[styles.settingsLabel, { color }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textSecondary} />
-    </TouchableOpacity>
-  );
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SIZES.padding, paddingTop: 48, paddingBottom: 40 },
+  gearBtn: { position: 'absolute', top: 52, right: SIZES.padding, zIndex: 10, padding: 4 },
   header: { alignItems: 'center', marginBottom: 20 },
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 36, color: COLORS.white, fontWeight: '900' },
@@ -141,8 +108,4 @@ const styles = StyleSheet.create({
   achTitle: { fontSize: 13, fontWeight: '800', color: COLORS.text },
   achTextLocked: { color: COLORS.textSecondary },
   achDesc: { fontSize: 11, color: COLORS.textSecondary, lineHeight: 15 },
-  settingsCard: { backgroundColor: COLORS.card, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  settingsLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: COLORS.border, marginHorizontal: 16 },
 });

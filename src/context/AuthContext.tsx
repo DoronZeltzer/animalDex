@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, FIREBASE_CONFIGURED } from '../config/firebase';
+import { auth, FIREBASE_CONFIGURED, db } from '../config/firebase';
 import { signUpWithEmail, signInWithEmail, signInWithGoogle, signOut } from '../services/authService';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +11,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   googleSignIn: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -27,10 +29,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timeout = setTimeout(() => setLoading(false), 3000);
     let unsubscribe: () => void = () => {};
     try {
-      unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         clearTimeout(timeout);
         setUser(firebaseUser);
         setLoading(false);
+
+        // Sync Firebase Auth display name to Firestore if missing
+        if (firebaseUser && db) {
+          try {
+            const profileRef = doc(db, 'users', firebaseUser.uid);
+            const snap = await getDoc(profileRef);
+            const data = snap.data();
+            if (!data?.displayName && firebaseUser.displayName) {
+              await setDoc(profileRef, {
+                uid: firebaseUser.uid,
+                displayName: firebaseUser.displayName,
+                email: firebaseUser.email ?? '',
+                photoURL: firebaseUser.photoURL ?? '',
+              }, { merge: true });
+            }
+          } catch {}
+        }
       });
     } catch {
       clearTimeout(timeout);
@@ -59,8 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut();
   };
 
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      setUser({ ...auth.currentUser });
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, googleSignIn, logout }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, googleSignIn, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

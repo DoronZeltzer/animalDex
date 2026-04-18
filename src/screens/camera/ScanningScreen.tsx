@@ -5,7 +5,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { CameraStackParamList } from '../../types/navigation';
 import { identifyAnimal } from '../../services/claudeService';
 import { COLORS } from '../../config/constants';
-import * as SecureStore from 'expo-secure-store';
+
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY ?? '';
 
 type Nav = RouteProp<CameraStackParamList, 'Scanning'>;
 
@@ -41,27 +42,15 @@ export default function ScanningScreen() {
   useEffect(() => {
     async function scan() {
       try {
-        const apiKey =
-          (await SecureStore.getItemAsync('GOOGLE_API_KEY')) ??
-          process.env.EXPO_PUBLIC_GOOGLE_API_KEY ??
-          '';
-        if (!apiKey) {
-          Alert.alert(
-            'API Key Missing',
-            'Set your Google API key in the Profile tab → Settings.',
-            [{ text: 'OK', onPress: () => navigation.goBack() }]
-          );
-          return;
-        }
         // Retry once on server overload errors
         let result;
         try {
-          result = await identifyAnimal(params.base64, apiKey);
+          result = await identifyAnimal(params.base64, GOOGLE_API_KEY);
         } catch (firstErr: any) {
           const status = firstErr.response?.status;
           if (status === 503 || status === 429 || firstErr.message?.toLowerCase().includes('overload')) {
             await new Promise(r => setTimeout(r, 3000));
-            result = await identifyAnimal(params.base64, apiKey);
+            result = await identifyAnimal(params.base64, GOOGLE_API_KEY);
           } else {
             throw firstErr;
           }
