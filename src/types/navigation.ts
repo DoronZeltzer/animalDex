@@ -20,6 +20,7 @@ export type CollectionsStackParamList = {
   Category: { category: 'land' | 'sea' | 'air' };
   Subcategory: { category: 'land' | 'sea' | 'air'; subcategory: string };
   AnimalDetail: { animalId: string };
+  WeeklyChallenges: undefined;
 };
 
 export type FriendsStackParamList = {

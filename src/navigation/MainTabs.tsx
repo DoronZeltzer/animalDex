@@ -3,9 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
+import { useGoldTheme } from '../context/GoldThemeContext';
 import { MainTabParamList, HomeStackParamList, CameraStackParamList, CollectionsStackParamList, FriendsStackParamList, ProfileStackParamList } from '../types/navigation';
 
 // Screens
+import WeeklyChallengesScreen from '../screens/collections/WeeklyChallengesScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import CameraScreen from '../screens/camera/CameraScreen';
 import ScanningScreen from '../screens/camera/ScanningScreen';
@@ -27,8 +29,9 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const HomeStack = createStackNavigator<HomeStackParamList>();
 function HomeNavigator() {
+  const { bg } = useGoldTheme();
   return (
-    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+    <HomeStack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: bg } }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
     </HomeStack.Navigator>
   );
@@ -36,8 +39,9 @@ function HomeNavigator() {
 
 const CameraStack = createStackNavigator<CameraStackParamList>();
 function CameraNavigator() {
+  const { bg } = useGoldTheme();
   return (
-    <CameraStack.Navigator screenOptions={{ headerShown: false }}>
+    <CameraStack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: bg } }}>
       <CameraStack.Screen name="Camera" component={CameraScreen} />
       <CameraStack.Screen name="Scanning" component={ScanningScreen} />
       <CameraStack.Screen name="AnimalCard" component={AnimalCardScreen} options={{ headerShown: true, title: 'New Discovery' }} />
@@ -47,8 +51,9 @@ function CameraNavigator() {
 
 const CollectionsStack = createStackNavigator<CollectionsStackParamList>();
 function CollectionsNavigator() {
+  const { bg } = useGoldTheme();
   return (
-    <CollectionsStack.Navigator screenOptions={{ headerTintColor: COLORS.primary }}>
+    <CollectionsStack.Navigator screenOptions={{ headerTintColor: COLORS.primary, cardStyle: { backgroundColor: bg } }}>
       <CollectionsStack.Screen name="Collections" component={CollectionsScreen} options={{ headerShown: false }} />
       <CollectionsStack.Screen
         name="Category"
@@ -61,14 +66,16 @@ function CollectionsNavigator() {
         options={({ route }) => ({ title: (route.params?.subcategory ?? 'Animals').charAt(0).toUpperCase() + (route.params?.subcategory ?? 'animals').slice(1) })}
       />
       <CollectionsStack.Screen name="AnimalDetail" component={AnimalDetailScreen} options={{ title: 'Animal Detail' }} />
+      <CollectionsStack.Screen name="WeeklyChallenges" component={WeeklyChallengesScreen} options={{ title: 'Weekly Challenges' }} />
     </CollectionsStack.Navigator>
   );
 }
 
 const FriendsStack = createStackNavigator<FriendsStackParamList>();
 function FriendsNavigator() {
+  const { bg } = useGoldTheme();
   return (
-    <FriendsStack.Navigator screenOptions={{ headerTintColor: COLORS.primary }}>
+    <FriendsStack.Navigator screenOptions={{ headerTintColor: COLORS.primary, cardStyle: { backgroundColor: bg } }}>
       <FriendsStack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }} />
       <FriendsStack.Screen name="FriendProfile" component={FriendProfileScreen} options={({ route }) => ({ title: route.params.friendName })} />
       <FriendsStack.Screen name="Chat" component={ChatScreen} options={({ route }) => ({ title: route.params.friendName })} />
@@ -79,8 +86,9 @@ function FriendsNavigator() {
 
 const ProfileStack = createStackNavigator<ProfileStackParamList>();
 function ProfileNavigator() {
+  const { bg } = useGoldTheme();
   return (
-    <ProfileStack.Navigator screenOptions={{ headerTintColor: COLORS.primary }}>
+    <ProfileStack.Navigator screenOptions={{ headerTintColor: COLORS.primary, cardStyle: { backgroundColor: bg } }}>
       <ProfileStack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
     </ProfileStack.Navigator>
@@ -90,6 +98,7 @@ function ProfileNavigator() {
 // ── Main Tabs ─────────────────────────────────────────────────────────────────
 
 export default function MainTabs() {
+  const { tabBar } = useGoldTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -97,7 +106,7 @@ export default function MainTabs() {
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarStyle: {
-          backgroundColor: COLORS.white,
+          backgroundColor: tabBar,
           borderTopColor: COLORS.border,
           borderTopWidth: 1,
           height: 60,

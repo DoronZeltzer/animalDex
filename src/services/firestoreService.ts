@@ -233,17 +233,29 @@ export interface ChallengeCompletion {
 }
 
 export async function completeChallenge(uid: string, weekId: string, animalName: string, animalId: string): Promise<void> {
-  await setDoc(doc(db, 'users', uid, 'challenges', weekId), {
-    weekId,
-    animalName,
-    animalId,
-    completedAt: serverTimestamp(),
-  });
+  await Promise.all([
+    setDoc(doc(db, 'users', uid, 'challenges', weekId), {
+      weekId, animalName, animalId, completedAt: serverTimestamp(),
+    }),
+    setDoc(doc(db, 'users', uid), {
+      goldLevel: increment(1),
+      lastCompletedWeekId: weekId,
+    }, { merge: true }),
+  ]);
 }
 
 export async function getChallengeCompletion(uid: string, weekId: string): Promise<ChallengeCompletion | null> {
   const snap = await getDoc(doc(db, 'users', uid, 'challenges', weekId));
   return snap.exists() ? (snap.data() as ChallengeCompletion) : null;
+}
+
+export async function getChallengeHistory(uid: string): Promise<ChallengeCompletion[]> {
+  const snap = await getDocs(collection(db, 'users', uid, 'challenges'));
+  return snap.docs.map(d => d.data() as ChallengeCompletion);
+}
+
+export async function resetGoldLevel(uid: string): Promise<void> {
+  await setDoc(doc(db, 'users', uid), { goldLevel: 0 }, { merge: true });
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────

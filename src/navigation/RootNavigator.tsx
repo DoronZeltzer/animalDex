@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { GoldThemeProvider } from '../context/GoldThemeContext';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import { COLORS } from '../config/constants';
@@ -16,7 +17,13 @@ export default function RootNavigator() {
     );
   }
 
-  return user ? <MainTabs /> : <AuthStack />;
+  if (!user) return <AuthStack />;
+
+  return (
+    <GoldThemeProvider>
+      <MainTabs />
+    </GoldThemeProvider>
+  );
 }
 
 const styles = StyleSheet.create({

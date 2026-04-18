@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SIZES } from '../../config/constants';
 import { useCollection } from '../../hooks/useCollection';
+import { useWeeklyChallenge } from '../../hooks/useWeeklyChallenge';
+import { useGoldTheme } from '../../context/GoldThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { CollectedAnimal } from '../../types/animal';
 
@@ -11,6 +13,8 @@ export default function CollectionsScreen() {
   const { animals: land } = useCollection('land');
   const { animals: sea } = useCollection('sea');
   const { animals: air } = useCollection('air');
+  const { goldLevel } = useGoldTheme();
+  const weeklyChallenge = useWeeklyChallenge();
   const [query, setQuery] = useState('');
 
   const total = land.length + sea.length + air.length;
@@ -100,13 +104,23 @@ export default function CollectionsScreen() {
             lightColor={COLORS.airLight}
             onPress={() => navigation.navigate('Category', { category: 'air' })}
           />
+          <CategoryCard
+            icon="trophy"
+            title="Weekly Challenges"
+            description={weeklyChallenge.completed ? `This week's challenge done! 🏆` : `This week: ${weeklyChallenge.challenge?.name ?? '...'}`}
+            count={goldLevel}
+            countLabel="gold level"
+            color="#D97706"
+            lightColor="#FEF3C7"
+            onPress={() => navigation.navigate('WeeklyChallenges')}
+          />
         </>
       )}
     </ScrollView>
   );
 }
 
-function CategoryCard({ icon, title, description, count, color, lightColor, onPress }: any) {
+function CategoryCard({ icon, title, description, count, countLabel = 'collected', color, lightColor, onPress }: any) {
   return (
     <TouchableOpacity style={[styles.card, { borderColor: color }]} onPress={onPress} activeOpacity={0.85}>
       <View style={[styles.iconArea, { backgroundColor: lightColor }]}>
@@ -115,7 +129,7 @@ function CategoryCard({ icon, title, description, count, color, lightColor, onPr
       <View style={styles.cardInfo}>
         <Text style={[styles.cardTitle, { color }]}>{title}</Text>
         <Text style={styles.cardDesc}>{description}</Text>
-        <Text style={[styles.cardCount, { color }]}>{count} collected</Text>
+        <Text style={[styles.cardCount, { color }]}>{count} {countLabel}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
     </TouchableOpacity>

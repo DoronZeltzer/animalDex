@@ -22,6 +22,7 @@ async function createUserProfile(uid: string, displayName: string, email: string
     airCount: 0,
     achievements: [],
     friends: [],
+    goldLevel: 0,
     pendingRequests: [],
     sentRequests: [],
     createdAt: serverTimestamp(),
